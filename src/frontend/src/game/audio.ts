@@ -63,9 +63,9 @@ function saveFlag(key: string, value: boolean): void {
 
 /**
  * Pick a bed for the current stage.
- * Early one-hop / two-hop rounds stay upbeat; flip-back, late, and
- * finale rounds switch to the spooky beds. The two variants of each
- * mood alternate so a long run does not loop the same file.
+ * Tracks stay put for a three-round block so a bed is not swapped on
+ * every clear. Early blocks are the fast cues; flip-back, two-hop-flip,
+ * and late rounds use the spooky cues.
  */
 export function musicForStage(
   levelNumber: number,
@@ -74,9 +74,9 @@ export function musicForStage(
   const round = ((Math.max(1, levelNumber) - 1) % 12) + 1;
   const tense =
     colorRule === "flipBack" || colorRule === "twoHopFlip" || round >= 7;
-  const alt = (Math.max(1, levelNumber) - 1) % 2 === 1;
-  if (tense) return alt ? "spooky2" : "spooky1";
-  return alt ? "fast2" : "fast1";
+  const block = Math.floor((round - 1) / 3);
+  if (tense) return block >= 3 ? "spooky2" : "spooky1";
+  return block >= 1 ? "fast2" : "fast1";
 }
 
 class ArcadeAudio {
@@ -87,17 +87,20 @@ class ArcadeAudio {
   private wantedTrack: MusicId | null = null;
   private fadeTimer: number | null = null;
   private ducked = false;
+  private backgrounded = false;
+  private stopped = true;
+  private lastSyncKey = "";
   muted = loadFlag(MUTE_KEY);
   musicOff = loadFlag(MUSIC_KEY);
 
-  /** Resume the audio context after a user gesture and retry music. */
+  /** Resume the audio context after a user gesture. Never restarts a bed. */
   unlock(): void {
     const ctx = this.ensure();
     if (ctx.state === "suspended") {
       void ctx.resume();
     }
     this.applyMusicMute();
-    if (this.wantedTrack) this.ensureMusic(this.wantedTrack, false);
+    this.resumeIfNeeded();
   }
 
   setMuted(muted: boolean): void {
@@ -105,6 +108,11 @@ class ArcadeAudio {
     saveFlag(MUTE_KEY, muted);
     if (this.master) this.master.gain.value = muted ? 0 : SFX_MASTER;
     this.applyMusicMute();
+    if (muted) {
+      this.pauseMusicElement();
+      return;
+    }
+    this.resumeIfNeeded();
   }
 
   setMusicOff(off: boolean): void {
@@ -115,22 +123,23 @@ class ArcadeAudio {
       this.pauseMusicElement();
       return;
     }
-    if (this.wantedTrack) this.ensureMusic(this.wantedTrack, false);
+    this.resumeIfNeeded();
   }
 
   /** Pause the bed when the tab is hidden; resume from the same bar. */
   setBackgrounded(hidden: boolean): void {
+    this.backgrounded = hidden;
     if (hidden) {
       this.pauseMusicElement();
       return;
     }
-    if (this.wantedTrack) this.ensureMusic(this.wantedTrack, false);
+    this.resumeIfNeeded();
   }
 
   /**
    * Keep the looping bed in sync with the current screen / phase.
-   * Music plays while hopping, stays ducked on pause, and stops on
-   * the menu or game over. Only the active file is requested.
+   * Idempotent: hops, frame ticks, and unlocks do not restart audio.
+   * Music plays during a run, ducks on pause, and stops on menu / game over.
    */
   syncMusic(input: {
     screen: Screen;
@@ -138,20 +147,24 @@ class ArcadeAudio {
     levelNumber: number;
     colorRule: ColorRule;
   }): void {
+    const key = `${input.screen}|${input.phase}|${input.levelNumber}|${input.colorRule}`;
+    if (key === this.lastSyncKey) return;
+    this.lastSyncKey = key;
+
     const playing =
       input.screen === "game" &&
       (input.phase === "playing" ||
         input.phase === "paused" ||
         input.phase === "levelclear");
-    this.ducked = input.phase === "paused" || input.phase === "levelclear";
+    this.ducked = input.phase === "paused";
     if (!playing) {
       this.wantedTrack = null;
-      this.fadeTo(0, 0.45, true);
+      this.stopMusic();
       return;
     }
     const track = musicForStage(input.levelNumber, input.colorRule);
     this.wantedTrack = track;
-    this.ensureMusic(track, this.currentTrack !== track);
+    this.ensureMusic(track);
   }
 
   play(name: SfxName): void {
@@ -261,7 +274,7 @@ class ArcadeAudio {
   }
 
   private musicAllowed(): boolean {
-    return !this.muted && !this.musicOff;
+    return !this.muted && !this.musicOff && !this.backgrounded;
   }
 
   private targetVolume(): number {
@@ -271,46 +284,84 @@ class ArcadeAudio {
 
   private applyMusicMute(): void {
     if (!this.music) return;
-    this.music.muted = !this.musicAllowed();
-    if (this.musicAllowed()) {
-      this.music.volume = this.targetVolume();
+    this.music.muted = this.muted || this.musicOff;
+  }
+
+  private srcMatches(track: MusicId): boolean {
+    const el = this.music;
+    if (!el || !el.src) return false;
+    return el.src.endsWith(TRACKS[track]);
+  }
+
+  private ensureElement(): HTMLAudioElement {
+    if (this.music) return this.music;
+    const el = new Audio();
+    el.loop = true;
+    el.preload = "auto";
+    el.setAttribute("playsinline", "true");
+    this.music = el;
+    return el;
+  }
+
+  /** Load or keep a track. Restart only when the bed actually changes. */
+  private ensureMusic(track: MusicId): void {
+    if (!this.musicAllowed()) {
+      this.currentTrack = track;
+      this.pauseMusicElement();
+      return;
+    }
+    const el = this.ensureElement();
+    const same = this.currentTrack === track && this.srcMatches(track);
+    if (same && !this.stopped) {
+      this.applyDuckVolume();
+      this.resumeIfNeeded();
+      return;
+    }
+    el.pause();
+    el.src = TRACKS[track];
+    el.currentTime = 0;
+    this.currentTrack = track;
+    this.stopped = false;
+    el.muted = false;
+    el.volume = 0;
+    void el.play().then(
+      () => this.fadeTo(this.targetVolume(), 0.4, false),
+      () => {
+        // Autoplay blocked until the next unlock() from a gesture.
+      },
+    );
+  }
+
+  private resumeIfNeeded(): void {
+    if (!this.wantedTrack || this.stopped || !this.musicAllowed()) return;
+    const el = this.music;
+    if (!el) {
+      this.ensureMusic(this.wantedTrack);
+      return;
+    }
+    this.applyDuckVolume();
+    if (el.paused) {
+      void el.play().catch(() => {
+        // Autoplay blocked until the next gesture.
+      });
     }
   }
 
-  private ensureMusic(track: MusicId, restart: boolean): void {
-    if (!this.musicAllowed()) {
-      this.pauseMusicElement();
-      this.currentTrack = track;
-      return;
-    }
-    if (!this.music) {
-      const el = new Audio();
-      el.loop = true;
-      el.preload = "none";
-      el.setAttribute("playsinline", "true");
-      this.music = el;
-    }
+  private applyDuckVolume(): void {
     const el = this.music;
-    const src = TRACKS[track];
-    if (restart || this.currentTrack !== track || !el.src.endsWith(src)) {
-      el.pause();
-      el.src = src;
-      el.currentTime = 0;
-      this.currentTrack = track;
-    }
-    el.muted = false;
+    if (!el || this.stopped) return;
     const dest = this.targetVolume();
-    if (el.paused) {
-      el.volume = 0;
-      void el.play().then(
-        () => this.fadeTo(dest, 0.55, false),
-        () => {
-          // Autoplay blocked until the next unlock() from a gesture.
-        },
-      );
+    if (Math.abs(el.volume - dest) < 0.02) {
+      el.volume = dest;
       return;
     }
-    this.fadeTo(dest, 0.35, false);
+    this.fadeTo(dest, 0.25, false);
+  }
+
+  private stopMusic(): void {
+    if (this.stopped && !this.music) return;
+    this.stopped = true;
+    this.fadeTo(0, 0.4, true);
   }
 
   private pauseMusicElement(): void {
@@ -326,6 +377,11 @@ class ArcadeAudio {
     }
     const start = el.volume;
     const from = Number.isFinite(start) ? start : 0;
+    if (Math.abs(from - volume) < 0.01) {
+      el.volume = volume;
+      if (stopAtZero && volume <= 0.001) this.pauseMusicElement();
+      return;
+    }
     const steps = Math.max(4, Math.floor(seconds * 24));
     let i = 0;
     this.fadeTimer = window.setInterval(
@@ -337,10 +393,7 @@ class ArcadeAudio {
           if (this.fadeTimer !== null) window.clearInterval(this.fadeTimer);
           this.fadeTimer = null;
           el.volume = volume;
-          if (stopAtZero && volume <= 0.001) {
-            el.pause();
-            this.currentTrack = null;
-          }
+          if (stopAtZero && volume <= 0.001) this.pauseMusicElement();
         }
       },
       Math.max(16, Math.floor((seconds * 1000) / steps)),

@@ -43,14 +43,21 @@ export function useGameAudio(): void {
     prev.current.remaining = remainingCubes(start.board);
     if (start.phase === "playing") arcadeAudio.play("intro");
 
-    const unsub = useGameStore.subscribe((state) => {
+    const unsub = useGameStore.subscribe((state, previous) => {
       const p = prev.current;
-      arcadeAudio.syncMusic({
-        screen: state.screen,
-        phase: state.phase,
-        levelNumber: state.levelNumber,
-        colorRule: state.level.colorRule,
-      });
+      if (
+        state.screen !== previous.screen ||
+        state.phase !== previous.phase ||
+        state.levelNumber !== previous.levelNumber ||
+        state.level.colorRule !== previous.level.colorRule
+      ) {
+        arcadeAudio.syncMusic({
+          screen: state.screen,
+          phase: state.phase,
+          levelNumber: state.levelNumber,
+          colorRule: state.level.colorRule,
+        });
+      }
 
       if (state.player.hopping && !p.hopping) arcadeAudio.play("hop");
       if (!state.player.hopping && p.hopping && !state.player.falling) {
@@ -140,12 +147,14 @@ export function useGameAudio(): void {
     return () => {
       unsub();
       document.removeEventListener("visibilitychange", onVisibility);
-      arcadeAudio.syncMusic({
-        screen: "menu",
-        phase: "menu",
-        levelNumber: 1,
-        colorRule: "oneHop",
-      });
+      if (useGameStore.getState().screen !== "game") {
+        arcadeAudio.syncMusic({
+          screen: "menu",
+          phase: "menu",
+          levelNumber: 1,
+          colorRule: "oneHop",
+        });
+      }
     };
   }, []);
 }
