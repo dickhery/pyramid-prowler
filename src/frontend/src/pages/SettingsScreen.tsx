@@ -55,6 +55,8 @@ export function SettingsScreen() {
   const setDifficulty = useGameStore((s) => s.setDifficulty);
   const colorBlind = useGameStore((s) => s.colorBlind);
   const setColorBlind = useGameStore((s) => s.setColorBlind);
+  const soundMuted = useGameStore((s) => s.soundMuted);
+  const setSoundMuted = useGameStore((s) => s.setSoundMuted);
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-pop px-6">
@@ -88,6 +90,13 @@ export function SettingsScreen() {
             checked={colorBlind}
             onChange={setColorBlind}
             dataOcid="settings.colorblind_toggle"
+          />
+          <ToggleRow
+            label="Mute sound"
+            hint="Arcade hops, falls, and stage jingles stay in the browser"
+            checked={soundMuted}
+            onChange={setSoundMuted}
+            dataOcid="settings.mute_toggle"
           />
         </div>
 

@@ -1,3 +1,4 @@
+import { arcadeAudio } from "@/game/audio";
 import { useGameStore } from "@/game/store";
 import { BookOpen, Play, Settings } from "lucide-react";
 
@@ -84,7 +85,11 @@ export function MainMenu() {
         <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:flex-wrap sm:justify-center">
           <PillButton
             dataOcid="menu.start_button"
-            onClick={startGame}
+            onClick={() => {
+              arcadeAudio.unlock();
+              arcadeAudio.play("ui");
+              startGame();
+            }}
             className="text-xl"
           >
             <Play className="size-5 fill-current" />

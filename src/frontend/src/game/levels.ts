@@ -1,12 +1,13 @@
 /**
  * Stage definitions for Pyramid Prowler.
  *
- * Classic 7-row pyramid (28 cubes) with arcade-style color rules:
- * hop once, hop twice, flip-back, then two-hop + flip. Enemies are
- * spawned during play from each stage's roster — not pre-placed.
+ * Arcade stages with changing silhouettes (height 5–8, several cuts)
+ * and escalating color rules. Enemies spawn during play from each
+ * stage roster — they are not pre-placed.
  */
 import { placeDiscs } from "./board";
 import type {
+  BoardShape,
   ColorRule,
   DiscSpot,
   Enemy,
@@ -16,11 +17,11 @@ import type {
   SpawnKind,
 } from "./types";
 
-const PYRAMID_HEIGHT = 7;
-
 interface StageSpec {
   id: number;
   name: string;
+  height: number;
+  shape: BoardShape;
   colorRule: ColorRule;
   discs: number;
   spawnEvery: number;
@@ -38,10 +39,10 @@ function makeLevel(spec: StageSpec): Level {
   return {
     id: spec.id,
     name: spec.name,
-    width: PYRAMID_HEIGHT,
-    depth: PYRAMID_HEIGHT,
-    height: PYRAMID_HEIGHT,
-    shape: "pyramid",
+    width: spec.height,
+    depth: spec.height,
+    height: spec.height,
+    shape: spec.shape,
     targetColor: "target",
     colorRule: spec.colorRule,
     lives: 3,
@@ -50,7 +51,7 @@ function makeLevel(spec: StageSpec): Level {
     enemies: [] as Enemy[],
     powerUps: [] as PowerUp[],
     gems: [] as Gem[],
-    discSpots: placeDiscs(PYRAMID_HEIGHT, spec.discs) as DiscSpot[],
+    discSpots: placeDiscs(spec.height, spec.discs) as DiscSpot[],
     spawnEvery: spec.spawnEvery,
     spawnRoster: spec.spawnRoster,
     maxEnemies: spec.maxEnemies,
@@ -67,6 +68,8 @@ const STAGES: StageSpec[] = [
   {
     id: 1,
     name: "The First Glow",
+    height: 6,
+    shape: "pyramid",
     colorRule: "oneHop",
     discs: 2,
     spawnEvery: 4.2,
@@ -82,6 +85,8 @@ const STAGES: StageSpec[] = [
   {
     id: 2,
     name: "Purple Hatchling",
+    height: 7,
+    shape: "pyramid",
     colorRule: "oneHop",
     discs: 2,
     spawnEvery: 3.6,
@@ -97,6 +102,8 @@ const STAGES: StageSpec[] = [
   {
     id: 3,
     name: "Mischief Green",
+    height: 5,
+    shape: "mesa",
     colorRule: "oneHop",
     discs: 2,
     spawnEvery: 3.3,
@@ -112,6 +119,8 @@ const STAGES: StageSpec[] = [
   {
     id: 4,
     name: "Sidewinders",
+    height: 7,
+    shape: "wings",
     colorRule: "oneHop",
     discs: 2,
     spawnEvery: 3.1,
@@ -133,6 +142,8 @@ const STAGES: StageSpec[] = [
   {
     id: 5,
     name: "Two-Tone Trouble",
+    height: 7,
+    shape: "chevron",
     colorRule: "twoHop",
     discs: 2,
     spawnEvery: 3.0,
@@ -148,6 +159,8 @@ const STAGES: StageSpec[] = [
   {
     id: 6,
     name: "Second Coat",
+    height: 7,
+    shape: "hourglass",
     colorRule: "twoHop",
     discs: 2,
     spawnEvery: 2.8,
@@ -170,6 +183,8 @@ const STAGES: StageSpec[] = [
   {
     id: 7,
     name: "Flip-Back Folly",
+    height: 8,
+    shape: "trident",
     colorRule: "flipBack",
     discs: 2,
     spawnEvery: 2.7,
@@ -192,6 +207,8 @@ const STAGES: StageSpec[] = [
   {
     id: 8,
     name: "Don't Step Twice",
+    height: 7,
+    shape: "floating",
     colorRule: "flipBack",
     discs: 3,
     spawnEvery: 2.5,
@@ -214,6 +231,8 @@ const STAGES: StageSpec[] = [
   {
     id: 9,
     name: "Double Flip",
+    height: 8,
+    shape: "stepped",
     colorRule: "twoHopFlip",
     discs: 3,
     spawnEvery: 2.4,
@@ -236,6 +255,8 @@ const STAGES: StageSpec[] = [
   {
     id: 10,
     name: "Rush Hour",
+    height: 8,
+    shape: "rotating",
     colorRule: "twoHopFlip",
     discs: 3,
     spawnEvery: 2.2,
@@ -259,6 +280,8 @@ const STAGES: StageSpec[] = [
   {
     id: 11,
     name: "Apex Storm",
+    height: 8,
+    shape: "spire",
     colorRule: "twoHop",
     discs: 3,
     spawnEvery: 2.0,
@@ -282,6 +305,8 @@ const STAGES: StageSpec[] = [
   {
     id: 12,
     name: "The Final Glow",
+    height: 8,
+    shape: "chevron",
     colorRule: "twoHopFlip",
     discs: 4,
     spawnEvery: 1.85,

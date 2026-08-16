@@ -10,6 +10,9 @@ import type {
 /** Edge length of a single cube in world units. */
 export const CUBE_SIZE = 1;
 
+/** Forward step per pyramid row — close to a full cube so tops stay readable. */
+export const ROW_DEPTH = 0.86;
+
 /** Distance from a cube's top face to the character origin (body center). */
 export const FOOT_OFFSET = 0.56;
 
@@ -27,7 +30,7 @@ export function cubeCenter(
   pos: CubePosition,
 ): [number, number, number] {
   const s = CUBE_SIZE;
-  return [(pos.x - pos.z / 2) * s, pos.y * s + s / 2, pos.z * (s / 2)];
+  return [(pos.x - pos.z / 2) * s, pos.y * s + s / 2, pos.z * ROW_DEPTH];
 }
 
 /** World position of the top centre of a cube. */
@@ -57,15 +60,16 @@ export function hopWorldDelta(
   direction: HopDirection,
 ): [number, number, number] {
   const s = CUBE_SIZE;
+  const d = ROW_DEPTH;
   switch (direction) {
     case "north":
-      return [-s / 2, s, -s / 2];
+      return [-s / 2, s, -d];
     case "south":
-      return [s / 2, -s, s / 2];
+      return [s / 2, -s, d];
     case "east":
-      return [-s / 2, -s, s / 2];
+      return [-s / 2, -s, d];
     case "west":
-      return [s / 2, s, -s / 2];
+      return [s / 2, s, -d];
   }
 }
 
@@ -94,9 +98,21 @@ export function hopArc(
   ];
 }
 
-/** Look-at target for the isometric camera (pyramid visual centre). */
+/** Look-at target: visual centre of the staircase, slightly toward the front. */
 export function pyramidFocus(board: Board): [number, number, number] {
-  return [0, board.height * CUBE_SIZE * 0.36, board.height * CUBE_SIZE * 0.18];
+  const h = board.height;
+  return [0, h * CUBE_SIZE * 0.38, h * ROW_DEPTH * 0.48];
+}
+
+/**
+ * Default camera position: in front of the pyramid (+Z) and a little to the
+ * right, high enough that every top face reads as a diamond. The old equal
+ * +X/+Z rig looked along the side edge, so players had to yaw 90°.
+ */
+export function pyramidCameraPos(board: Board): [number, number, number] {
+  const [fx, fy, fz] = pyramidFocus(board);
+  const span = Math.max(board.height, 5);
+  return [fx + span * 0.22, fy + span * 0.92, fz + span * 1.38];
 }
 
 /** Top-face color for a cube using the level palette. */

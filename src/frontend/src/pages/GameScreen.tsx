@@ -2,8 +2,9 @@ import { HUD } from "@/components/HUD";
 import { Scene } from "@/components/three/Scene";
 import { useGameStore } from "@/game/store";
 import type { HopDirection } from "@/game/types";
+import { useGameAudio } from "@/game/useGameAudio";
 import { ArrowLeft, Camera, Pause, Play, RotateCcw } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { PillButton } from "./MainMenu";
 
 /**
@@ -48,7 +49,7 @@ function HopPad() {
 
   return (
     <div
-      className="pointer-events-auto absolute bottom-6 left-1/2 z-20 grid -translate-x-1/2 grid-cols-3 grid-rows-3 gap-2 sm:bottom-8"
+      className="pointer-events-auto absolute bottom-6 left-4 z-20 grid grid-cols-3 grid-rows-3 gap-2 sm:bottom-8"
       data-ocid="game.hop_pad"
     >
       <div />
@@ -67,6 +68,7 @@ function HopPad() {
 }
 
 export function GameScreen() {
+  useGameAudio();
   const phase = useGameStore((s) => s.phase);
   const cameraMode = useGameStore((s) => s.cameraMode);
   const setCameraMode = useGameStore((s) => s.setCameraMode);
@@ -79,6 +81,13 @@ export function GameScreen() {
   const score = useGameStore((s) => s.score);
   const levelNumber = useGameStore((s) => s.levelNumber);
   const levelName = useGameStore((s) => s.level.name);
+  const [showIntro, setShowIntro] = useState(true);
+
+  useEffect(() => {
+    setShowIntro(levelNumber > 0);
+    const timer = window.setTimeout(() => setShowIntro(false), 1700);
+    return () => window.clearTimeout(timer);
+  }, [levelNumber]);
 
   const toggleCamera = () =>
     setCameraMode(cameraMode === "isometric" ? "orbit" : "isometric");
@@ -143,6 +152,20 @@ export function GameScreen() {
       </div>
 
       {phase === "playing" && <HopPad />}
+
+      {phase === "playing" && showIntro && (
+        <div
+          data-ocid="game.round_intro"
+          className="pointer-events-none absolute inset-x-0 top-[22%] z-20 flex flex-col items-center animate-pop-in"
+        >
+          <span className="font-mono text-xs uppercase tracking-widest text-primary">
+            Round {levelNumber}
+          </span>
+          <h2 className="font-display text-4xl font-black text-foreground text-shadow-pop sm:text-5xl">
+            {levelName}
+          </h2>
+        </div>
+      )}
 
       {phase === "paused" && (
         <div

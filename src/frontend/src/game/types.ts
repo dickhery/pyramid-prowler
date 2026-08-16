@@ -34,7 +34,17 @@ export type SpecialBlock =
 export type ColorRule = "oneHop" | "twoHop" | "flipBack" | "twoHopFlip";
 
 /** The layout shape of a level's board. */
-export type BoardShape = "pyramid" | "stepped" | "floating" | "rotating";
+export type BoardShape =
+  | "pyramid"
+  | "stepped"
+  | "chevron"
+  | "hourglass"
+  | "wings"
+  | "trident"
+  | "mesa"
+  | "spire"
+  | "floating"
+  | "rotating";
 
 /** Arcade difficulty used to scale spawn rate and enemy hop speed. */
 export type Difficulty = "easy" | "normal" | "hard";

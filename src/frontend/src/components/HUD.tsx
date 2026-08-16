@@ -1,6 +1,6 @@
 import { remainingCubes } from "@/game/board";
 import { useGameStore } from "@/game/store";
-import { Disc3, Heart, Layers, Target } from "lucide-react";
+import { Disc3, Heart, Layers, Target, Volume2, VolumeX } from "lucide-react";
 
 function pad(value: number, width = 6): string {
   return String(value).padStart(width, "0");
@@ -124,6 +124,23 @@ function Status() {
   );
 }
 
+function MuteToggle() {
+  const muted = useGameStore((s) => s.soundMuted);
+  const setMuted = useGameStore((s) => s.setSoundMuted);
+  return (
+    <button
+      type="button"
+      data-ocid="hud.mute"
+      aria-label={muted ? "Unmute sound" : "Mute sound"}
+      onClick={() => setMuted(!muted)}
+      className="pointer-events-auto flex items-center gap-2 rounded-2xl bg-card/80 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-foreground shadow-plastic-sm backdrop-blur hover:bg-card"
+    >
+      {muted ? <VolumeX className="size-4" /> : <Volume2 className="size-4" />}
+      {muted ? "Muted" : "Sound"}
+    </button>
+  );
+}
+
 export function HUD() {
   const score = useGameStore((s) => s.score);
 
@@ -158,6 +175,7 @@ export function HUD() {
             <Remaining />
           </div>
         </div>
+        <MuteToggle />
       </div>
 
       <Status />

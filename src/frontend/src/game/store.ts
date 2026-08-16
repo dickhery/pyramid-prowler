@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { arcadeAudio } from "./audio";
 import { advanceLevel, hop, startLevel, update } from "./engine";
 import type {
   ActivePowerUps,
@@ -52,6 +53,7 @@ export interface GameState {
   extraLifeAwarded: boolean;
   difficulty: Difficulty;
   colorBlind: boolean;
+  soundMuted: boolean;
 
   goToMenu: () => void;
   goToGame: () => void;
@@ -80,6 +82,7 @@ export interface GameState {
   setCameraMode: (mode: CameraMode) => void;
   setDifficulty: (difficulty: Difficulty) => void;
   setColorBlind: (value: boolean) => void;
+  setSoundMuted: (value: boolean) => void;
   resetSession: () => void;
 }
 
@@ -96,6 +99,7 @@ export const useGameStore = create<GameState>((set) => ({
   extraLifeAwarded: false,
   difficulty: "normal",
   colorBlind: false,
+  soundMuted: arcadeAudio.muted,
 
   goToMenu: () => set({ screen: "menu", phase: "menu" }),
   goToGame: () => set({ screen: "game" }),
@@ -114,6 +118,7 @@ export const useGameStore = create<GameState>((set) => ({
       difficulty: s.difficulty,
       colorBlind: s.colorBlind,
       cameraMode: s.cameraMode,
+      soundMuted: s.soundMuted,
     })),
   pauseGame: () => set({ phase: "paused" }),
   resumeGame: () => set({ phase: "playing" }),
@@ -147,6 +152,10 @@ export const useGameStore = create<GameState>((set) => ({
   setCameraMode: (cameraMode) => set({ cameraMode }),
   setDifficulty: (difficulty) => set({ difficulty }),
   setColorBlind: (colorBlind) => set({ colorBlind }),
+  setSoundMuted: (soundMuted) => {
+    arcadeAudio.setMuted(soundMuted);
+    set({ soundMuted });
+  },
   resetSession: () =>
     set((s) => ({
       ...startLevel(STARTING_LEVEL, {
@@ -160,5 +169,6 @@ export const useGameStore = create<GameState>((set) => ({
       difficulty: s.difficulty,
       colorBlind: s.colorBlind,
       cameraMode: s.cameraMode,
+      soundMuted: s.soundMuted,
     })),
 }));

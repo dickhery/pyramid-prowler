@@ -6,6 +6,7 @@ import {
   isBoardPainted,
   keyOf,
   neighbor,
+  placeDiscsOnBoard,
 } from "./board";
 import {
   ENEMY_HOP_TIME,
@@ -517,6 +518,7 @@ export function startLevel(
   }
   const apexPos = apex(board).position;
   const lives = carry?.lives ?? level.lives;
+  const discSpots = placeDiscsOnBoard(board, level.discs);
   return {
     phase: "playing",
     level,
@@ -526,13 +528,13 @@ export function startLevel(
     enemies: [],
     powerUpItems: [],
     gems: [],
-    discSpots: level.discSpots.map((d) => ({ ...d })),
+    discSpots,
     particles: [],
     effectTimers: emptyEffectTimers(),
     shake: 0,
     message: level.name,
     lives,
-    discs: level.discSpots.length,
+    discs: discSpots.length,
     targetColor: level.targetColor,
     combo: 0,
     comboTimer: 0,

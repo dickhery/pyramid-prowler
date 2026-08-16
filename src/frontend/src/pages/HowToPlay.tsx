@@ -1,3 +1,4 @@
+import { arcadeAudio } from "@/game/audio";
 import { useGameStore } from "@/game/store";
 import { ArrowLeft, Play } from "lucide-react";
 import { PillButton } from "./MainMenu";
@@ -142,6 +143,15 @@ export function HowToPlay() {
             </p>
           </Section>
 
+          <Section title="Changing boards">
+            <p>
+              Each round uses a different silhouette — shorter mesas, taller
+              spires, chevrons, hourglasses, tridents, and boards with gaps. The
+              camera always looks at the front of the pyramid so every top face
+              is visible. Mute is in the HUD or Settings.
+            </p>
+          </Section>
+
           <Section title="Tips">
             <p>
               Paint toward the edges, then use a disc to escape the snake. Wait
@@ -152,7 +162,14 @@ export function HowToPlay() {
         </div>
 
         <div className="mt-8 flex justify-center">
-          <PillButton dataOcid="howto.start_button" onClick={startGame}>
+          <PillButton
+            dataOcid="howto.start_button"
+            onClick={() => {
+              arcadeAudio.unlock();
+              arcadeAudio.play("ui");
+              startGame();
+            }}
+          >
             <Play className="size-5 fill-current" />
             Start Hopping!
           </PillButton>

@@ -7,6 +7,7 @@
  */
 import type {
   Board,
+  BoardShape,
   Cube,
   CubeColor,
   CubePosition,
@@ -150,18 +151,29 @@ export function spawnRow(board: Board): CubePosition[] {
     { x: 0, z: 1, y },
     { x: 1, z: 1, y },
   ];
-  return spots.filter((p) => hasCube(board, p));
+  const found = spots.filter((p) => hasCube(board, p));
+  if (found.length > 0) return found;
+  return allCubes(board)
+    .filter((c) => c.position.z === 1)
+    .map((c) => c.position);
 }
 
-/** Bottom-left corner cube. */
+/** Lowest existing cube on the left edge (x = 0). */
 export function bottomLeft(board: Board): CubePosition {
-  return { x: 0, z: board.height - 1, y: 0 };
+  const left = allCubes(board).filter((c) => c.position.x === 0);
+  if (left.length === 0) return allCubes(board)[0].position;
+  return left.reduce((best, cube) =>
+    cube.position.z > best.position.z ? cube : best,
+  ).position;
 }
 
-/** Bottom-right corner cube. */
+/** Lowest existing cube on the right edge (x = z). */
 export function bottomRight(board: Board): CubePosition {
-  const z = board.height - 1;
-  return { x: z, z, y: 0 };
+  const right = allCubes(board).filter((c) => c.position.x === c.position.z);
+  if (right.length === 0) return allCubes(board)[0].position;
+  return right.reduce((best, cube) =>
+    cube.position.z > best.position.z ? cube : best,
+  ).position;
 }
 
 /** An unused disc that sits off `from` in `direction`. */
@@ -182,13 +194,14 @@ export function findDisc(
 
 /** Place classic side discs (left = north off x=0, right = west off x=z). */
 export function placeDiscs(height: number, count: number): DiscSpot[] {
-  const discs: DiscSpot[] = [];
   const mid = Math.max(2, Math.floor(height * 0.5));
   const low = Math.max(2, Math.floor(height * 0.72));
   const high = Math.max(2, Math.floor(height * 0.32));
-  const rows = [mid, low, high].slice(0, Math.max(1, count));
+  const rows = [mid, low, high];
+  const discs: DiscSpot[] = [];
   rows.forEach((z, i) => {
     const y = height - 1 - z;
+    if (z >= height) return;
     if (i % 2 === 0) {
       discs.push({
         id: `disc-L${i}`,
@@ -207,7 +220,6 @@ export function placeDiscs(height: number, count: number): DiscSpot[] {
       });
     }
   });
-  // Always try to have at least one on each side when count >= 2.
   if (count >= 2 && !discs.some((d) => d.direction === "west")) {
     discs.push({
       id: "disc-R",
@@ -218,6 +230,75 @@ export function placeDiscs(height: number, count: number): DiscSpot[] {
     });
   }
   return discs.slice(0, count);
+}
+
+/** Place discs only beside cubes that actually exist on this board. */
+export function placeDiscsOnBoard(board: Board, count: number): DiscSpot[] {
+  const left = allCubes(board)
+    .filter((c) => c.position.x === 0 && c.position.z >= 2)
+    .sort((a, b) => a.position.z - b.position.z);
+  const right = allCubes(board)
+    .filter((c) => c.position.x === c.position.z && c.position.z >= 2)
+    .sort((a, b) => a.position.z - b.position.z);
+  const picks: DiscSpot[] = [];
+  const take = (list: Cube[], i: number, side: "L" | "R"): DiscSpot | null => {
+    if (list.length === 0) return null;
+    const cube =
+      list[Math.min(list.length - 1, Math.floor((i * list.length) / 3))];
+    return {
+      id: `disc-${side}${i}`,
+      anchor: cube.position,
+      direction: side === "L" ? "north" : "west",
+      active: false,
+      used: false,
+    };
+  };
+  for (let i = 0; i < count; i++) {
+    const disc = i % 2 === 0 ? take(left, i, "L") : take(right, i, "R");
+    if (disc) picks.push(disc);
+  }
+  return picks;
+}
+
+/**
+ * Which cells of the triangle belong to this stage's silhouette.
+ * Top three rows and both long edges always stay so every cube is
+ * reachable from the apex.
+ */
+export function includeCell(
+  shape: BoardShape,
+  x: number,
+  z: number,
+  height: number,
+): boolean {
+  if (x < 0 || z < 0 || x > z || z >= height) return false;
+  if (z <= 2) return true;
+  if (x === 0 || x === z) return true;
+
+  switch (shape) {
+    case "mesa":
+    case "spire":
+    case "pyramid":
+      return true;
+    case "stepped":
+      return !(z % 2 === 1 && x === z - 1 && z >= 4);
+    case "chevron":
+      return !(z >= height - 2 && x !== 0 && x !== z);
+    case "hourglass": {
+      const lo = Math.floor(height * 0.4);
+      const hi = Math.floor(height * 0.72);
+      if (z >= lo && z <= hi && x !== Math.floor(z / 2)) return false;
+      return true;
+    }
+    case "wings":
+      return !(z >= 3 && z < height - 1 && x === Math.floor(z / 2));
+    case "trident":
+      return x === Math.floor(z / 2) || x === Math.ceil(z / 2);
+    case "floating":
+      return !(z === height - 3 && (x === 1 || x === z - 1) && z > 3);
+    case "rotating":
+      return !((x + z) % 3 === 0 && z > 3);
+  }
 }
 
 /** Create a fresh cube with default state. */
@@ -238,13 +319,14 @@ function makeCube(
   };
 }
 
-/** Build a classic triangular pyramid (28 cubes when height is 7). */
+/** Build a triangular staircase, then cut it to the stage silhouette. */
 function buildTriangle(level: Level): Board {
   const cubes: Record<string, Cube> = {};
   const height = level.height;
   for (let z = 0; z < height; z++) {
     const y = height - 1 - z;
     for (let x = 0; x <= z; x++) {
+      if (!includeCell(level.shape, x, z, height)) continue;
       cubes[key(x, z, y)] = makeCube(x, z, y, "none");
     }
   }
