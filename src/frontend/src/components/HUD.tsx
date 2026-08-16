@@ -175,9 +175,7 @@ export function HUD() {
             <Remaining />
           </div>
         </div>
-        <div className="hidden sm:block">
-          <MuteToggle />
-        </div>
+        <MuteToggle />
       </div>
 
       <Status />

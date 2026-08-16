@@ -46,14 +46,22 @@ export function MainMenu() {
 
   return (
     <div className="relative flex min-h-dvh flex-col items-center justify-center overflow-y-auto overflow-x-hidden bg-gradient-pop px-4 py-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-6">
-      <div className="absolute inset-0 flex items-center justify-center opacity-20">
-        <div className="grid grid-cols-5 gap-2">
-          {DECO_KEYS.map((k) => (
-            <div
-              key={k}
-              className="size-8 rounded-md bg-primary/40 shadow-plastic-sm"
-            />
-          ))}{" "}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <img
+          src="/assets/images/hero.webp"
+          alt=""
+          className="absolute inset-x-0 top-0 h-[52%] w-full object-cover object-top opacity-45"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-background/20 via-background/70 to-background" />
+        <div className="absolute inset-0 flex items-center justify-center opacity-15">
+          <div className="grid grid-cols-5 gap-2">
+            {DECO_KEYS.map((k) => (
+              <div
+                key={k}
+                className="size-8 rounded-md bg-primary/40 shadow-plastic-sm"
+              />
+            ))}
+          </div>
         </div>
       </div>
 

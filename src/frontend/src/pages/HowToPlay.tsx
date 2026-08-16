@@ -156,13 +156,23 @@ export function HowToPlay() {
             </p>
           </Section>
 
+          <Section title="Sound">
+            <p>
+              While you hop, a looping stage bed plays in the browser — bright
+              and fast on early rounds, spookier once flip-back and finale
+              stages begin. Mute music or effects separately in Settings, or tap
+              Sound on the HUD. 8-bit cues mark hops, paints, extra lives, and
+              close calls.
+            </p>
+          </Section>
+
           <Section title="Changing boards">
             <p>
               Each round uses a different silhouette — shorter mesas, taller
               spires, chevrons, hourglasses, tridents, and boards with gaps. The
               camera looks at the pyramid from the isometric corner so cubes sit
               on a diagonal staircase, not a straight wall, and every top face
-              stays visible. Mute is in the HUD or Settings.
+              stays visible.
             </p>
           </Section>
 

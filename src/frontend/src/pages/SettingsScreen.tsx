@@ -57,6 +57,8 @@ export function SettingsScreen() {
   const setColorBlind = useGameStore((s) => s.setColorBlind);
   const soundMuted = useGameStore((s) => s.soundMuted);
   const setSoundMuted = useGameStore((s) => s.setSoundMuted);
+  const musicOff = useGameStore((s) => s.musicOff);
+  const setMusicOff = useGameStore((s) => s.setMusicOff);
 
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center overflow-y-auto bg-gradient-pop px-4 py-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-6">
@@ -92,11 +94,18 @@ export function SettingsScreen() {
             dataOcid="settings.colorblind_toggle"
           />
           <ToggleRow
-            label="Mute sound"
-            hint="Arcade hops, falls, and stage jingles stay in the browser"
+            label="Mute sound effects"
+            hint="8-bit hops, falls, and jingles stay in the browser"
             checked={soundMuted}
             onChange={setSoundMuted}
             dataOcid="settings.mute_toggle"
+          />
+          <ToggleRow
+            label="Mute music"
+            hint="Stage beds play only while you hop — fast early, spooky later"
+            checked={musicOff}
+            onChange={setMusicOff}
+            dataOcid="settings.music_toggle"
           />
         </div>
 

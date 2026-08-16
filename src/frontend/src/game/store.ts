@@ -54,6 +54,7 @@ export interface GameState {
   difficulty: Difficulty;
   colorBlind: boolean;
   soundMuted: boolean;
+  musicOff: boolean;
 
   goToMenu: () => void;
   goToGame: () => void;
@@ -84,6 +85,7 @@ export interface GameState {
   setDifficulty: (difficulty: Difficulty) => void;
   setColorBlind: (value: boolean) => void;
   setSoundMuted: (value: boolean) => void;
+  setMusicOff: (value: boolean) => void;
   resetSession: () => void;
 }
 
@@ -101,6 +103,7 @@ export const useGameStore = create<GameState>((set) => ({
   difficulty: "normal",
   colorBlind: false,
   soundMuted: arcadeAudio.muted,
+  musicOff: arcadeAudio.musicOff,
 
   goToMenu: () => set({ screen: "menu", phase: "menu" }),
   goToGame: () => set({ screen: "game" }),
@@ -109,19 +112,30 @@ export const useGameStore = create<GameState>((set) => ({
   goToLeaderboard: () => set({ screen: "leaderboard" }),
 
   startGame: () =>
-    set((s) => ({
-      screen: "game",
-      score: STARTING_SCORE,
-      extraLifeAwarded: false,
-      ...startLevel(STARTING_LEVEL, {
-        lives: STARTING_LIVES,
+    set((s) => {
+      const next = {
+        screen: "game" as const,
+        score: STARTING_SCORE,
         extraLifeAwarded: false,
-      }),
-      difficulty: s.difficulty,
-      colorBlind: s.colorBlind,
-      cameraMode: s.cameraMode,
-      soundMuted: s.soundMuted,
-    })),
+        ...startLevel(STARTING_LEVEL, {
+          lives: STARTING_LIVES,
+          extraLifeAwarded: false,
+        }),
+        difficulty: s.difficulty,
+        colorBlind: s.colorBlind,
+        cameraMode: s.cameraMode,
+        soundMuted: s.soundMuted,
+        musicOff: s.musicOff,
+      };
+      arcadeAudio.unlock();
+      arcadeAudio.syncMusic({
+        screen: "game",
+        phase: next.phase ?? "playing",
+        levelNumber: next.levelNumber ?? STARTING_LEVEL,
+        colorRule: next.level?.colorRule ?? "oneHop",
+      });
+      return next;
+    }),
   pauseGame: () => set({ phase: "paused" }),
   resumeGame: () => set({ phase: "playing" }),
   clearLevel: () => set({ phase: "levelclear" }),
@@ -136,10 +150,23 @@ export const useGameStore = create<GameState>((set) => ({
       }),
     ),
   nextLevel: () =>
-    set((s) => ({
-      ...advanceLevel(s),
-      score: s.score,
-    })),
+    set((s) => {
+      const next = {
+        ...advanceLevel(s),
+        score: s.score,
+      };
+      const phase = next.phase ?? "playing";
+      const levelNumber = next.levelNumber ?? s.levelNumber + 1;
+      const colorRule = next.level?.colorRule ?? s.level.colorRule;
+      arcadeAudio.unlock();
+      arcadeAudio.syncMusic({
+        screen: "game",
+        phase,
+        levelNumber,
+        colorRule,
+      });
+      return next;
+    }),
   hop: (direction) => set((s) => hop(s, direction)),
   update: (deltaTime) => set((s) => update(s, deltaTime)),
 
@@ -158,6 +185,10 @@ export const useGameStore = create<GameState>((set) => ({
     arcadeAudio.setMuted(soundMuted);
     set({ soundMuted });
   },
+  setMusicOff: (musicOff) => {
+    arcadeAudio.setMusicOff(musicOff);
+    set({ musicOff });
+  },
   resetSession: () =>
     set((s) => ({
       ...startLevel(STARTING_LEVEL, {
@@ -172,5 +203,6 @@ export const useGameStore = create<GameState>((set) => ({
       colorBlind: s.colorBlind,
       cameraMode: s.cameraMode,
       soundMuted: s.soundMuted,
+      musicOff: s.musicOff,
     })),
 }));

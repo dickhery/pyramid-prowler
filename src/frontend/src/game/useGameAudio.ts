@@ -4,8 +4,9 @@ import { remainingCubes } from "./board";
 import { useGameStore } from "./store";
 
 /**
- * Watch the zustand store and play arcade cues. Kept out of the pure
- * engine so the game loop stays deterministic and cycle-free.
+ * Watch the zustand store and play arcade cues plus stage music.
+ * Kept out of the pure engine so the game loop stays deterministic
+ * and the backend never spends cycles on audio.
  */
 export function useGameAudio(): void {
   const prev = useRef({
@@ -20,11 +21,37 @@ export function useGameAudio(): void {
     phase: "menu" as string,
     message: null as string | null,
     score: 0,
+    combo: 0,
+    levelNumber: 0,
   });
 
   useEffect(() => {
+    const sync = () => {
+      const state = useGameStore.getState();
+      arcadeAudio.syncMusic({
+        screen: state.screen,
+        phase: state.phase,
+        levelNumber: state.levelNumber,
+        colorRule: state.level.colorRule,
+      });
+    };
+    sync();
+    const start = useGameStore.getState();
+    prev.current.phase = start.phase;
+    prev.current.levelNumber = start.levelNumber;
+    prev.current.lives = start.lives;
+    prev.current.remaining = remainingCubes(start.board);
+    if (start.phase === "playing") arcadeAudio.play("intro");
+
     const unsub = useGameStore.subscribe((state) => {
       const p = prev.current;
+      arcadeAudio.syncMusic({
+        screen: state.screen,
+        phase: state.phase,
+        levelNumber: state.levelNumber,
+        colorRule: state.level.colorRule,
+      });
+
       if (state.player.hopping && !p.hopping) arcadeAudio.play("hop");
       if (!state.player.hopping && p.hopping && !state.player.falling) {
         arcadeAudio.play("land");
@@ -43,6 +70,30 @@ export function useGameAudio(): void {
       const left = remainingCubes(state.board);
       if (left < p.remaining && state.phase === "playing") {
         arcadeAudio.play("paint");
+      }
+      if (
+        state.phase === "playing" &&
+        left <= 3 &&
+        p.remaining > 3 &&
+        left > 0
+      ) {
+        arcadeAudio.play("warning");
+      }
+      if (state.combo > p.combo && state.combo >= 3 && state.combo % 3 === 0) {
+        arcadeAudio.play("combo");
+      }
+      if (
+        state.phase === "playing" &&
+        p.phase !== "paused" &&
+        (p.phase !== "playing" || state.levelNumber !== p.levelNumber)
+      ) {
+        arcadeAudio.play("intro");
+      }
+      if (state.phase === "paused" && p.phase === "playing") {
+        arcadeAudio.play("pause");
+      }
+      if (state.phase === "playing" && p.phase === "paused") {
+        arcadeAudio.play("resume");
       }
       if (state.phase === "levelclear" && p.phase !== "levelclear") {
         arcadeAudio.play("clear");
@@ -75,8 +126,26 @@ export function useGameAudio(): void {
         phase: state.phase,
         message: state.message,
         score: state.score,
+        combo: state.combo,
+        levelNumber: state.levelNumber,
       };
     });
-    return unsub;
+
+    const onVisibility = () => {
+      arcadeAudio.setBackgrounded(document.hidden);
+      if (!document.hidden) sync();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      unsub();
+      document.removeEventListener("visibilitychange", onVisibility);
+      arcadeAudio.syncMusic({
+        screen: "menu",
+        phase: "menu",
+        levelNumber: 1,
+        colorRule: "oneHop",
+      });
+    };
   }, []);
 }
