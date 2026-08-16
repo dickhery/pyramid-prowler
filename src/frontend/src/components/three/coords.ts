@@ -98,21 +98,95 @@ export function hopArc(
   ];
 }
 
-/** Look-at target: visual centre of the staircase, slightly toward the front. */
+/** Starting vertical field of view — wide enough to show a full tall board. */
+export const CAMERA_FOV = 42;
+
+/** World-axis-aligned bounds of every cube, padded for discs and the hopper. */
+export function boardBounds(board: Board): {
+  min: [number, number, number];
+  max: [number, number, number];
+  center: [number, number, number];
+} {
+  const cubes = Object.values(board.cubes);
+  if (cubes.length === 0) {
+    return { min: [-1, 0, -1], max: [1, 2, 1], center: [0, 1, 0] };
+  }
+  const half = CUBE_SIZE / 2;
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let minZ = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+  let maxZ = Number.NEGATIVE_INFINITY;
+  for (const cube of cubes) {
+    const [x, y, z] = cubeCenter(board, cube.position);
+    minX = Math.min(minX, x - half);
+    maxX = Math.max(maxX, x + half);
+    minY = Math.min(minY, y - half);
+    maxY = Math.max(maxY, y + half);
+    minZ = Math.min(minZ, z - half);
+    maxZ = Math.max(maxZ, z + half);
+  }
+  // Side discs sit one hop off the edges; leave room for the character.
+  minX -= CUBE_SIZE;
+  maxX += CUBE_SIZE;
+  maxY += FOOT_OFFSET + 0.4;
+  minZ -= ROW_DEPTH;
+  maxZ += ROW_DEPTH;
+  return {
+    min: [minX, minY, minZ],
+    max: [maxX, maxY, maxZ],
+    center: [(minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2],
+  };
+}
+
+/** Look-at target: true visual centre of the current silhouette. */
 export function pyramidFocus(board: Board): [number, number, number] {
-  const h = board.height;
-  return [0, h * CUBE_SIZE * 0.38, h * ROW_DEPTH * 0.48];
+  return boardBounds(board).center;
 }
 
 /**
- * Default camera position: in front of the pyramid (+Z) and a little to the
- * right, high enough that every top face reads as a diamond. The old equal
- * +X/+Z rig looked along the side edge, so players had to yaw 90°.
+ * Distance from the focus that fits the whole board in the frustum.
+ * `padding` covers HUD, hop pad, and a little breathing room.
  */
-export function pyramidCameraPos(board: Board): [number, number, number] {
+export function fitDistance(
+  board: Board,
+  fovDeg = CAMERA_FOV,
+  aspect = 16 / 9,
+  padding = 1.55,
+): number {
+  const { min, max } = boardBounds(board);
+  const width = max[0] - min[0];
+  // The staircase is both tall and deep; from the front-elevated angle those
+  // two axes stack on screen, so add a share of depth to the vertical size.
+  const height = max[1] - min[1] + (max[2] - min[2]) * 0.45;
+  const fov = (fovDeg * Math.PI) / 180;
+  const half = Math.tan(fov / 2);
+  const distV = height / 2 / half;
+  const distH = width / 2 / half / Math.max(aspect, 0.5);
+  return Math.max(distV, distH, 8) * padding;
+}
+
+/**
+ * Default camera: in front of the pyramid (+Z), a little to the right, far
+ * enough that every cube (and the side discs) is on screen at start.
+ */
+export function pyramidCameraPos(
+  board: Board,
+  aspect = 16 / 9,
+  zoom = 1,
+): [number, number, number] {
   const [fx, fy, fz] = pyramidFocus(board);
-  const span = Math.max(board.height, 5);
-  return [fx + span * 0.22, fy + span * 0.92, fz + span * 1.38];
+  const dist = fitDistance(board, CAMERA_FOV, aspect) * zoom;
+  const dirX = 0.2;
+  const dirY = 0.78;
+  const dirZ = 1.42;
+  const len = Math.hypot(dirX, dirY, dirZ);
+  return [
+    fx + (dirX / len) * dist,
+    fy + (dirY / len) * dist,
+    fz + (dirZ / len) * dist,
+  ];
 }
 
 /** Top-face color for a cube using the level palette. */

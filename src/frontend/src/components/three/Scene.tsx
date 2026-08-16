@@ -2,13 +2,19 @@ import { useGameStore } from "@/game/store";
 import type { DiscSpot } from "@/game/types";
 import { OrbitControls } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { Character } from "./Character";
 import { Effects, ScreenShake } from "./Effects";
 import { EnemyModels } from "./EnemyModels";
 import { Pyramid } from "./Pyramid";
-import { discWorldPos, pyramidCameraPos, pyramidFocus } from "./coords";
+import {
+  CAMERA_FOV,
+  discWorldPos,
+  fitDistance,
+  pyramidCameraPos,
+  pyramidFocus,
+} from "./coords";
 
 function Ground() {
   return (
@@ -17,7 +23,7 @@ function Ground() {
       position={[0, -0.02, 2]}
       receiveShadow
     >
-      <planeGeometry args={[48, 48]} />
+      <planeGeometry args={[80, 80]} />
       <meshStandardMaterial color="#12122a" roughness={1} metalness={0} />
     </mesh>
   );
@@ -81,20 +87,33 @@ function GameLoop() {
 function CameraRig() {
   const cameraMode = useGameStore((s) => s.cameraMode);
   const board = useGameStore((s) => s.board);
-  const { camera } = useThree();
+  const { camera, size } = useThree();
   const target = useRef(new THREE.Vector3());
   const dest = useRef(new THREE.Vector3());
   const ready = useRef(false);
+  const zoom = useRef(1);
   const lastKey = useRef(`${board.height}-${board.shape}`);
+
+  useEffect(() => {
+    const onWheel = (event: WheelEvent) => {
+      if (cameraMode !== "isometric") return;
+      const next = zoom.current * (event.deltaY > 0 ? 1.08 : 0.92);
+      zoom.current = Math.min(1.65, Math.max(0.5, next));
+    };
+    window.addEventListener("wheel", onWheel, { passive: true });
+    return () => window.removeEventListener("wheel", onWheel);
+  }, [cameraMode]);
 
   useFrame(() => {
     const key = `${board.height}-${board.shape}`;
     if (lastKey.current !== key) {
       lastKey.current = key;
       ready.current = false;
+      zoom.current = 1;
     }
+    const aspect = size.width / Math.max(size.height, 1);
     const [fx, fy, fz] = pyramidFocus(board);
-    const [px, py, pz] = pyramidCameraPos(board);
+    const [px, py, pz] = pyramidCameraPos(board, aspect, zoom.current);
     target.current.set(fx, fy, fz);
     dest.current.set(px, py, pz);
     if (cameraMode !== "isometric") {
@@ -107,7 +126,7 @@ function CameraRig() {
       ready.current = true;
       return;
     }
-    camera.position.lerp(dest.current, 0.12);
+    camera.position.lerp(dest.current, 0.16);
     camera.lookAt(target.current);
   });
   return null;
@@ -118,6 +137,7 @@ export function Scene() {
   const board = useGameStore((s) => s.board);
   const [fx, fy, fz] = pyramidFocus(board);
   const [px, py, pz] = pyramidCameraPos(board);
+  const fitted = fitDistance(board);
 
   return (
     <Canvas
@@ -125,16 +145,16 @@ export function Scene() {
       dpr={[1, 2]}
       camera={{
         position: [px, py, pz],
-        fov: 34,
+        fov: CAMERA_FOV,
         near: 0.1,
-        far: 90,
+        far: 160,
       }}
       onCreated={({ camera }) => {
         camera.lookAt(fx, fy, fz);
       }}
     >
       <color attach="background" args={["#121028"]} />
-      <fog attach="fog" args={["#121028", 22, 48]} />
+      <fog attach="fog" args={["#121028", 36, 90]} />
       <ambientLight intensity={0.62} />
       <directionalLight
         position={[4, 16, 10]}
@@ -142,11 +162,11 @@ export function Scene() {
         castShadow
         shadow-mapSize-width={1024}
         shadow-mapSize-height={1024}
-        shadow-camera-far={40}
-        shadow-camera-left={-12}
-        shadow-camera-right={12}
-        shadow-camera-top={12}
-        shadow-camera-bottom={-12}
+        shadow-camera-far={60}
+        shadow-camera-left={-18}
+        shadow-camera-right={18}
+        shadow-camera-top={18}
+        shadow-camera-bottom={-18}
       />
       <directionalLight position={[-8, 6, 4]} intensity={0.4} />
       <hemisphereLight args={["#9aa6e0", "#1a1630", 0.34]} />
@@ -164,8 +184,9 @@ export function Scene() {
       {cameraMode === "orbit" && (
         <OrbitControls
           enablePan={false}
-          minDistance={7}
-          maxDistance={22}
+          enableZoom
+          minDistance={fitted * 0.45}
+          maxDistance={fitted * 2.4}
           maxPolarAngle={Math.PI / 2.15}
           target={[fx, fy, fz]}
         />
