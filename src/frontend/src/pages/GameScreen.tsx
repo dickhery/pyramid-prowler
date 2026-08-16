@@ -1,4 +1,5 @@
 import { HUD } from "@/components/HUD";
+import { SaveScore } from "@/components/SaveScore";
 import { Scene } from "@/components/three/Scene";
 import { useGameStore } from "@/game/store";
 import type { HopDirection } from "@/game/types";
@@ -239,6 +240,7 @@ export function GameScreen() {
               Final score {score.toLocaleString()} on stage {levelNumber}. The
               pyramid is still waiting.
             </p>
+            <SaveScore points={score} stage={levelNumber} />
             <div className="flex flex-col items-center gap-3">
               <PillButton dataOcid="game.retry_button" onClick={startGame}>
                 <RotateCcw className="size-5" />

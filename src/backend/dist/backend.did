@@ -13,6 +13,26 @@ type UserRole =
    guest;
    user;
  };
+type SubmitResult = 
+ variant {
+   err: SubmitError;
+   ok: Score;
+ };
+type SubmitError = 
+ variant {
+   anonymous;
+   nameInvalid;
+   notHighEnough;
+   zeroScore;
+ };
+type Score = 
+ record {
+   displayName: text;
+   owner: principal;
+   points: nat;
+   recordedAt: int;
+   stage: nat;
+ };
 type Result__1 = 
  variant {
    err: Error;
@@ -57,6 +77,9 @@ service : {
   assignCallerUserRole: (user: principal, role: UserRole) -> ();
   execute: (qJson: text) -> (Result) query;
   getCallerUserRole: () -> (UserRole) query;
+  getLeaderboard: () -> (vec Score) query;
+  getMyScore: () -> (opt Score) query;
   isCallerAdmin: () -> (bool) query;
   schema: () -> (text) query;
+  submitScore: (displayName: text, points: nat, stage: nat) -> (SubmitResult);
 }

@@ -268,6 +268,6 @@ export type GamePhase =
   | "levelclear"
   | "gameover";
 
-export type Screen = "menu" | "game" | "settings" | "howto";
+export type Screen = "menu" | "game" | "settings" | "howto" | "leaderboard";
 
 export type CameraMode = "isometric" | "orbit";

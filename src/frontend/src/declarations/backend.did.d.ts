@@ -29,6 +29,19 @@ export type Error = { 'FrontendOriginsNotConfigured' : null } |
 export interface Result { 'hasMore' : boolean, 'rows' : Array<Array<Cell>> }
 export type Result__1 = { 'ok' : null } |
   { 'err' : Error };
+export interface Score {
+  'displayName' : string,
+  'owner' : Principal,
+  'recordedAt' : bigint,
+  'stage' : bigint,
+  'points' : bigint,
+}
+export type SubmitError = { 'zeroScore' : null } |
+  { 'anonymous' : null } |
+  { 'notHighEnough' : null } |
+  { 'nameInvalid' : null };
+export type SubmitResult = { 'ok' : Score } |
+  { 'err' : SubmitError };
 export type UserRole = { 'admin' : null } |
   { 'user' : null } |
   { 'guest' : null };
@@ -45,8 +58,11 @@ export interface _SERVICE {
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
   'execute' : ActorMethod<[string], Result>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
+  'getLeaderboard' : ActorMethod<[], Array<Score>>,
+  'getMyScore' : ActorMethod<[], [] | [Score]>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
   'schema' : ActorMethod<[], string>,
+  'submitScore' : ActorMethod<[string, bigint, bigint], SubmitResult>,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];

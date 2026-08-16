@@ -59,6 +59,7 @@ export interface GameState {
   goToGame: () => void;
   goToSettings: () => void;
   goToHowTo: () => void;
+  goToLeaderboard: () => void;
 
   startGame: () => void;
   pauseGame: () => void;
@@ -105,6 +106,7 @@ export const useGameStore = create<GameState>((set) => ({
   goToGame: () => set({ screen: "game" }),
   goToSettings: () => set({ screen: "settings" }),
   goToHowTo: () => set({ screen: "howto" }),
+  goToLeaderboard: () => set({ screen: "leaderboard" }),
 
   startGame: () =>
     set((s) => ({

@@ -143,6 +143,15 @@ export function HowToPlay() {
             </p>
           </Section>
 
+          <Section title="Leaderboard">
+            <p>
+              After a run, sign in with Internet Identity, pick a 2–16 character
+              display name, and save your personal best. The public board keeps
+              the top 20. One identity, one best score — beating your old score
+              replaces the row.
+            </p>
+          </Section>
+
           <Section title="Changing boards">
             <p>
               Each round uses a different silhouette — shorter mesas, taller

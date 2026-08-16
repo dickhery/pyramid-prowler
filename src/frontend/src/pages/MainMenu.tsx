@@ -1,6 +1,6 @@
 import { arcadeAudio } from "@/game/audio";
 import { useGameStore } from "@/game/store";
-import { BookOpen, Play, Settings } from "lucide-react";
+import { BookOpen, Play, Settings, Trophy } from "lucide-react";
 
 /** Stable unique keys for the decorative background cubes (not array indices). */
 const DECO_KEYS = Array.from({ length: 25 }, (_, i) => `deco-${i}`);
@@ -42,6 +42,7 @@ export function MainMenu() {
   const startGame = useGameStore((s) => s.startGame);
   const goToSettings = useGameStore((s) => s.goToSettings);
   const goToHowTo = useGameStore((s) => s.goToHowTo);
+  const goToLeaderboard = useGameStore((s) => s.goToLeaderboard);
 
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-gradient-pop px-6">
@@ -102,6 +103,14 @@ export function MainMenu() {
           >
             <BookOpen className="size-5" />
             How to Play
+          </PillButton>
+          <PillButton
+            dataOcid="menu.leaderboard_button"
+            onClick={goToLeaderboard}
+            variant="secondary"
+          >
+            <Trophy className="size-5" />
+            Leaderboard
           </PillButton>
           <PillButton
             dataOcid="menu.settings_button"

@@ -48,6 +48,20 @@ export const Result = IDL.Record({
   'hasMore' : IDL.Bool,
   'rows' : IDL.Vec(IDL.Vec(Cell)),
 });
+export const Score = IDL.Record({
+  'displayName' : IDL.Text,
+  'owner' : IDL.Principal,
+  'recordedAt' : IDL.Int,
+  'stage' : IDL.Nat,
+  'points' : IDL.Nat,
+});
+export const SubmitError = IDL.Variant({
+  'zeroScore' : IDL.Null,
+  'anonymous' : IDL.Null,
+  'notHighEnough' : IDL.Null,
+  'nameInvalid' : IDL.Null,
+});
+export const SubmitResult = IDL.Variant({ 'ok' : Score, 'err' : SubmitError });
 
 export const idlService = IDL.Service({
   '_initialize_access_control' : IDL.Func([], [], []),
@@ -56,8 +70,11 @@ export const idlService = IDL.Service({
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
   'execute' : IDL.Func([IDL.Text], [Result], ['query']),
   'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
+  'getLeaderboard' : IDL.Func([], [IDL.Vec(Score)], ['query']),
+  'getMyScore' : IDL.Func([], [IDL.Opt(Score)], ['query']),
   'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
   'schema' : IDL.Func([], [IDL.Text], ['query']),
+  'submitScore' : IDL.Func([IDL.Text, IDL.Nat, IDL.Nat], [SubmitResult], []),
 });
 
 export const idlInitArgs = [];
@@ -103,6 +120,20 @@ export const idlFactory = ({ IDL }) => {
     'hasMore' : IDL.Bool,
     'rows' : IDL.Vec(IDL.Vec(Cell)),
   });
+  const Score = IDL.Record({
+    'displayName' : IDL.Text,
+    'owner' : IDL.Principal,
+    'recordedAt' : IDL.Int,
+    'stage' : IDL.Nat,
+    'points' : IDL.Nat,
+  });
+  const SubmitError = IDL.Variant({
+    'zeroScore' : IDL.Null,
+    'anonymous' : IDL.Null,
+    'notHighEnough' : IDL.Null,
+    'nameInvalid' : IDL.Null,
+  });
+  const SubmitResult = IDL.Variant({ 'ok' : Score, 'err' : SubmitError });
   
   return IDL.Service({
     '_initialize_access_control' : IDL.Func([], [], []),
@@ -111,8 +142,11 @@ export const idlFactory = ({ IDL }) => {
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
     'execute' : IDL.Func([IDL.Text], [Result], ['query']),
     'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
+    'getLeaderboard' : IDL.Func([], [IDL.Vec(Score)], ['query']),
+    'getMyScore' : IDL.Func([], [IDL.Opt(Score)], ['query']),
     'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
     'schema' : IDL.Func([], [IDL.Text], ['query']),
+    'submitScore' : IDL.Func([IDL.Text, IDL.Nat, IDL.Nat], [SubmitResult], []),
   });
 };
 

@@ -7,6 +7,28 @@ export interface None {
     __kind__: "None";
 }
 export type Option<T> = Some<T> | None;
+export type SubmitResult = {
+    __kind__: "ok";
+    ok: Score;
+} | {
+    __kind__: "err";
+    err: SubmitError;
+};
+export interface Result {
+    hasMore: boolean;
+    rows: Array<Array<Cell>>;
+}
+export interface Cell {
+    value: Value;
+    name: string;
+}
+export interface Score {
+    displayName: string;
+    owner: Principal;
+    recordedAt: bigint;
+    stage: bigint;
+    points: bigint;
+}
 export type Result__1 = {
     __kind__: "ok";
     ok: null;
@@ -58,10 +80,6 @@ export type Error_ = {
         expected: Array<string>;
     };
 };
-export interface Result {
-    hasMore: boolean;
-    rows: Array<Array<Cell>>;
-}
 export type Value = {
     __kind__: "int";
     int: bigint;
@@ -81,9 +99,11 @@ export type Value = {
     __kind__: "text";
     text: string;
 };
-export interface Cell {
-    value: Value;
-    name: string;
+export enum SubmitError {
+    zeroScore = "zeroScore",
+    anonymous = "anonymous",
+    notHighEnough = "notHighEnough",
+    nameInvalid = "nameInvalid"
 }
 export enum UserRole {
     admin = "admin",
@@ -94,6 +114,9 @@ export interface backendInterface {
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     execute(qJson: string): Promise<Result>;
     getCallerUserRole(): Promise<UserRole>;
+    getLeaderboard(): Promise<Array<Score>>;
+    getMyScore(): Promise<Score | null>;
     isCallerAdmin(): Promise<boolean>;
     schema(): Promise<string>;
+    submitScore(displayName: string, points: bigint, stage: bigint): Promise<SubmitResult>;
 }

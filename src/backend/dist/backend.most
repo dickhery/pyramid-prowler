@@ -1,33 +1,77 @@
 // Version: 4.0.0
-type AccessControlState__449078230 =
+type AccessControlState__243905556 =
   {
     var adminAssigned : Bool;
-    userRoles : Map__386906547<Principal, UserRole__446461802>
+    userRoles : Map__550130151<Principal, UserRole__444505526>
   };
-type Data__265875254<K, V> = {var count : Nat__58649523; kvs : [var ?(K, V)]};
-type Internal__161573640<K, V> =
-  {children : [var ?Node__430031793<K, V>]; data : Data__265875254<K, V>};
-type Leaf__1045638083<K, V> = {data : Data__265875254<K, V>};
-type Map__13625999<K, V> =
-  {var root : Node__430031793<K, V>; var size : Nat__58649523};
-type Map__386906547<K, V> = Map__670138087<K, V>;
-type Map__670138087<K, V> = Map__13625999<K, V>;
-type Nat__58649523 = Nat__920180692;
+type AccessControlState__586394314 =
+  {
+    var adminAssigned : Bool;
+    userRoles : Map__550130151<Principal, UserRole__558174619>
+  };
+type Data__930495304<K, V> =
+  {var count : Nat__672247612; kvs : [var ?(K, V)]};
+type Internal__1024925981<K, V> =
+  {children : [var ?Node__840238328<K, V>]; data : Data__930495304<K, V>};
+type Leaf__577977540<K, V> = {data : Data__930495304<K, V>};
+type List__218951235<T> =
+  {
+    var blockIndex : Nat__672247612;
+    var blocks : [var [var ?T]];
+    var elementIndex : Nat__672247612
+  };
+type List__386555976<T> = List__218951235<T>;
+type Map__1011167285<K, V> =
+  {var root : Node__840238328<K, V>; var size : Nat__672247612};
+type Map__501141927<K, V> = Map__1011167285<K, V>;
+type Map__550130151<K, V> = Map__501141927<K, V>;
+type Nat__672247612 = Nat__920180692;
 type Nat__920180692 = Nat;
-type NewActor__981806979 =
-  {accessControlState : AccessControlState__449078230};
-type Node__430031793<K, V> =
-  {#internal : Internal__161573640<K, V>; #leaf : Leaf__1045638083<K, V>};
-type OldActor__247784856 = {};
-type UserRole__446461802 = {#admin; #guest; #user};
-type UserRole__91647283 = {#admin; #guest; #user};
+type NewActor__126828543 =
+  {
+    accessControlState : AccessControlState__243905556;
+    scores : List__386555976<Score__310528897>
+  };
+type NewActor__698144924 =
+  {accessControlState : AccessControlState__586394314};
+type Node__840238328<K, V> =
+  {#internal : Internal__1024925981<K, V>; #leaf : Leaf__577977540<K, V>};
+type OldActor__283379789 =
+  {accessControlState : AccessControlState__243905556};
+type OldActor__9837938 = {};
+type Score__156382468 =
+  {
+    displayName : Text;
+    owner : Principal;
+    points : Nat;
+    recordedAt : Int;
+    stage : Nat
+  };
+type Score__310528897 =
+  {
+    displayName : Text;
+    owner : Principal;
+    points : Nat;
+    recordedAt : Int;
+    stage : Nat
+  };
+type UserRole__444505526 = {#admin; #guest; #user};
+type UserRole__45088130 = {#admin; #guest; #user};
+type UserRole__558174619 = {#admin; #guest; #user};
 {
-  "20260816_022945" : (_old : OldActor__247784856) -> NewActor__981806979
+  "20260816_022945" : (_old : OldActor__9837938) -> NewActor__698144924;
+  "20260816_180000" : (old : OldActor__283379789) -> NewActor__126828543
 }
 actor  {
   stable accessControlState :
     {
       var adminAssigned : Bool;
-      userRoles : Map__386906547<Principal, UserRole__91647283>
+      userRoles : Map__550130151<Principal, UserRole__45088130>
+    };
+  stable scores :
+    {
+      var blockIndex : Nat__672247612;
+      var blocks : [var [var ?Score__156382468]];
+      var elementIndex : Nat__672247612
     }
 };

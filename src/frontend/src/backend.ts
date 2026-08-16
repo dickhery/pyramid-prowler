@@ -53,6 +53,28 @@ function record_opt_to_undefined<T>(arg: T | null): T | undefined {
 }
 import { ExternalBlob } from "@caffeineai/object-storage";
 export { ExternalBlob } from "@caffeineai/object-storage";
+export type SubmitResult = {
+    __kind__: "ok";
+    ok: Score;
+} | {
+    __kind__: "err";
+    err: SubmitError;
+};
+export interface Result {
+    hasMore: boolean;
+    rows: Array<Array<Cell>>;
+}
+export interface Cell {
+    value: Value;
+    name: string;
+}
+export interface Score {
+    displayName: string;
+    owner: Principal;
+    recordedAt: bigint;
+    stage: bigint;
+    points: bigint;
+}
 export type Result__1 = {
     __kind__: "ok";
     ok: null;
@@ -104,10 +126,6 @@ export type Error_ = {
         expected: Array<string>;
     };
 };
-export interface Result {
-    hasMore: boolean;
-    rows: Array<Array<Cell>>;
-}
 export type Value = {
     __kind__: "int";
     int: bigint;
@@ -127,9 +145,11 @@ export type Value = {
     __kind__: "text";
     text: string;
 };
-export interface Cell {
-    value: Value;
-    name: string;
+export enum SubmitError {
+    zeroScore = "zeroScore",
+    anonymous = "anonymous",
+    notHighEnough = "notHighEnough",
+    nameInvalid = "nameInvalid"
 }
 export enum UserRole {
     admin = "admin",
@@ -143,10 +163,13 @@ export interface backendInterface {
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     execute(qJson: string): Promise<Result>;
     getCallerUserRole(): Promise<UserRole>;
+    getLeaderboard(): Promise<Array<Score>>;
+    getMyScore(): Promise<Score | null>;
     isCallerAdmin(): Promise<boolean>;
     schema(): Promise<string>;
+    submitScore(displayName: string, points: bigint, stage: bigint): Promise<SubmitResult>;
 }
-import type { Cell as _Cell, Error as _Error, Result as _Result, Result__1 as _Result__1, UserRole as _UserRole, Value as _Value } from "./declarations/backend.did.d.ts";
+import type { Cell as _Cell, Error as _Error, Result as _Result, Result__1 as _Result__1, Score as _Score, SubmitError as _SubmitError, SubmitResult as _SubmitResult, UserRole as _UserRole, Value as _Value } from "./declarations/backend.did.d.ts";
 export class Backend implements backendInterface {
     constructor(private actor: ActorSubclass<_SERVICE>, private _uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, private _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, private processError?: (error: unknown) => never){}
     async _initialize_access_control(): Promise<void> {
@@ -233,6 +256,34 @@ export class Backend implements backendInterface {
             return from_candid_UserRole_n15(this._uploadFile, this._downloadFile, result);
         }
     }
+    async getLeaderboard(): Promise<Array<Score>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getLeaderboard();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getLeaderboard();
+            return result;
+        }
+    }
+    async getMyScore(): Promise<Score | null> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getMyScore();
+                return from_candid_opt_n17(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getMyScore();
+            return from_candid_opt_n17(this._uploadFile, this._downloadFile, result);
+        }
+    }
     async isCallerAdmin(): Promise<boolean> {
         if (this.processError) {
             try {
@@ -261,6 +312,20 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+    async submitScore(arg0: string, arg1: bigint, arg2: bigint): Promise<SubmitResult> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.submitScore(arg0, arg1, arg2);
+                return from_candid_SubmitResult_n18(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.submitScore(arg0, arg1, arg2);
+            return from_candid_SubmitResult_n18(this._uploadFile, this._downloadFile, result);
+        }
+    }
 }
 function from_candid_Cell_n11(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Cell): Cell {
     return from_candid_record_n12(_uploadFile, _downloadFile, value);
@@ -274,11 +339,20 @@ function from_candid_Result__1_n1(_uploadFile: (file: ExternalBlob) => Promise<U
 function from_candid_Result_n7(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Result): Result {
     return from_candid_record_n8(_uploadFile, _downloadFile, value);
 }
+function from_candid_SubmitError_n20(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _SubmitError): SubmitError {
+    return from_candid_variant_n21(_uploadFile, _downloadFile, value);
+}
+function from_candid_SubmitResult_n18(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _SubmitResult): SubmitResult {
+    return from_candid_variant_n19(_uploadFile, _downloadFile, value);
+}
 function from_candid_UserRole_n15(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _UserRole): UserRole {
     return from_candid_variant_n16(_uploadFile, _downloadFile, value);
 }
 function from_candid_Value_n13(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Value): Value {
     return from_candid_variant_n14(_uploadFile, _downloadFile, value);
+}
+function from_candid_opt_n17(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_Score]): Score | null {
+    return value.length === 0 ? null : value[0];
 }
 function from_candid_record_n12(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     value: _Value;
@@ -364,6 +438,25 @@ function from_candid_variant_n16(_uploadFile: (file: ExternalBlob) => Promise<Ui
 }): UserRole {
     return "admin" in value ? UserRole.admin : "user" in value ? UserRole.user : "guest" in value ? UserRole.guest : value;
 }
+function from_candid_variant_n19(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    ok: _Score;
+} | {
+    err: _SubmitError;
+}): {
+    __kind__: "ok";
+    ok: Score;
+} | {
+    __kind__: "err";
+    err: SubmitError;
+} {
+    return "ok" in value ? {
+        __kind__: "ok",
+        ok: value.ok
+    } : "err" in value ? {
+        __kind__: "err",
+        err: from_candid_SubmitError_n20(_uploadFile, _downloadFile, value.err)
+    } : value;
+}
 function from_candid_variant_n2(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     ok: null;
 } | {
@@ -382,6 +475,17 @@ function from_candid_variant_n2(_uploadFile: (file: ExternalBlob) => Promise<Uin
         __kind__: "err",
         err: from_candid_Error_n3(_uploadFile, _downloadFile, value.err)
     } : value;
+}
+function from_candid_variant_n21(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    zeroScore: null;
+} | {
+    anonymous: null;
+} | {
+    notHighEnough: null;
+} | {
+    nameInvalid: null;
+}): SubmitError {
+    return "zeroScore" in value ? SubmitError.zeroScore : "anonymous" in value ? SubmitError.anonymous : "notHighEnough" in value ? SubmitError.notHighEnough : "nameInvalid" in value ? SubmitError.nameInvalid : value;
 }
 function from_candid_variant_n4(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     FrontendOriginsNotConfigured: null;
