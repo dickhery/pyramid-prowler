@@ -1,19 +1,25 @@
 /**
  * Board generation and cube helpers for Pyramid Prowler.
  *
- * A board is a pyramid of cubes arranged in layers. Layer `y` (0 = bottom) is a
- * square of side `height - y`, so the top layer is a single cube (the apex).
- * Cubes are keyed by "x,z,y" in a flat record for O(1) lookup.
+ * A board is a triangular staircase of cubes. Valid cells satisfy
+ * 0 <= x <= z <= height-1, and y = height-1-z. The apex is (0, 0, height-1).
+ * Every cube is reachable from the apex via the four diagonal hops.
  */
 import type {
   Board,
-  BoardShape,
   Cube,
   CubeColor,
   CubePosition,
+  DiscSpot,
+  HopDirection,
   Level,
   SpecialBlock,
 } from "./types";
+
+export const DIRECTIONS: HopDirection[] = ["north", "south", "east", "west"];
+
+/** Downward hops used by bouncing balls, eggs, and green gremlins. */
+export const DOWN_DIRECTIONS: HopDirection[] = ["east", "south"];
 
 /** Build the record key for a cube position. */
 export function key(x: number, z: number, y: number): string {
@@ -25,15 +31,32 @@ export function keyOf(pos: CubePosition): string {
   return key(pos.x, pos.z, pos.y);
 }
 
-/** Whether a cube exists at the given layer coordinates. */
-export function inLayer(
-  x: number,
-  z: number,
-  y: number,
-  height: number,
-): boolean {
-  const side = height - y;
-  return x >= 0 && z >= 0 && x < side && z < side;
+/** Whether two positions occupy the same cube. */
+export function samePos(a: CubePosition, b: CubePosition): boolean {
+  return a.x === b.x && a.z === b.z && a.y === b.y;
+}
+
+/** Grid delta for one hop. */
+export function hopDelta(direction: HopDirection): CubePosition {
+  switch (direction) {
+    case "north":
+      return { x: -1, z: -1, y: 1 };
+    case "south":
+      return { x: 1, z: 1, y: -1 };
+    case "east":
+      return { x: 0, z: 1, y: -1 };
+    case "west":
+      return { x: 0, z: -1, y: 1 };
+  }
+}
+
+/** Apply a hop to a position (does not check the board). */
+export function applyHop(
+  pos: CubePosition,
+  direction: HopDirection,
+): CubePosition {
+  const d = hopDelta(direction);
+  return { x: pos.x + d.x, z: pos.z + d.z, y: pos.y + d.y };
 }
 
 /** Look up a cube on the board, or undefined if it does not exist. */
@@ -47,11 +70,7 @@ export function hasCube(board: Board, pos: CubePosition): boolean {
 }
 
 /**
- * The four diagonal hop targets from a cube, in direction order.
- *
- * Q*bert-style movement on the triangle: each hop changes the row `z` by ±1
- * and the column `x` by 0 or ±1, with the layer `y` moving opposite to `z`
- * (y = height-1-z). The four hops are:
+ * The four diagonal hop targets from a cube.
  *   north (up-left):    (x-1, z-1, y+1)
  *   south (down-right): (x+1, z+1, y-1)
  *   east  (down-left):  (x,   z+1, y-1)
@@ -60,25 +79,42 @@ export function hasCube(board: Board, pos: CubePosition): boolean {
 export function neighbor(
   board: Board,
   pos: CubePosition,
-  direction: "north" | "south" | "east" | "west",
+  direction: HopDirection,
 ): CubePosition | undefined {
-  const { x, z, y } = pos;
-  let target: CubePosition;
-  switch (direction) {
-    case "north":
-      target = { x: x - 1, z: z - 1, y: y + 1 };
-      break;
-    case "south":
-      target = { x: x + 1, z: z + 1, y: y - 1 };
-      break;
-    case "east":
-      target = { x, z: z + 1, y: y - 1 };
-      break;
-    case "west":
-      target = { x, z: z - 1, y: y + 1 };
-      break;
-  }
+  const target = applyHop(pos, direction);
   return hasCube(board, target) ? target : undefined;
+}
+
+/** Which hop, if any, takes `from` to `to`. */
+export function directionBetween(
+  from: CubePosition,
+  to: CubePosition,
+): HopDirection | undefined {
+  for (const dir of DIRECTIONS) {
+    const n = applyHop(from, dir);
+    if (samePos(n, to)) return dir;
+  }
+  return undefined;
+}
+
+/** All valid hop destinations from a cube. */
+export function neighborsOf(board: Board, pos: CubePosition): CubePosition[] {
+  const out: CubePosition[] = [];
+  for (const dir of DIRECTIONS) {
+    const n = neighbor(board, pos, dir);
+    if (n) out.push(n);
+  }
+  return out;
+}
+
+/** Downward neighbors (used by bouncing balls). */
+export function downNeighbors(board: Board, pos: CubePosition): CubePosition[] {
+  const out: CubePosition[] = [];
+  for (const dir of DOWN_DIRECTIONS) {
+    const n = neighbor(board, pos, dir);
+    if (n) out.push(n);
+  }
+  return out;
 }
 
 /** All cubes on the board as a flat array. */
@@ -96,7 +132,7 @@ export function remainingCubes(board: Board): number {
   return allCubes(board).filter((cube) => !cube.painted).length;
 }
 
-/** Pick a random cube from the board (used by teleporters). */
+/** Pick a random cube from the board. */
 export function randomCube(board: Board): Cube {
   const cubes = allCubes(board);
   return cubes[Math.floor(Math.random() * cubes.length)];
@@ -107,10 +143,81 @@ export function apex(board: Board): Cube {
   return board.cubes[key(0, 0, board.height - 1)];
 }
 
-/** A random cube on the bottom layer (used for disc destinations). */
-export function randomBottomCube(board: Board): Cube {
-  const bottom = allCubes(board).filter((cube) => cube.position.y === 0);
-  return bottom[Math.floor(Math.random() * bottom.length)];
+/** The two cubes on the second row — classic spawn points. */
+export function spawnRow(board: Board): CubePosition[] {
+  const y = board.height - 2;
+  const spots: CubePosition[] = [
+    { x: 0, z: 1, y },
+    { x: 1, z: 1, y },
+  ];
+  return spots.filter((p) => hasCube(board, p));
+}
+
+/** Bottom-left corner cube. */
+export function bottomLeft(board: Board): CubePosition {
+  return { x: 0, z: board.height - 1, y: 0 };
+}
+
+/** Bottom-right corner cube. */
+export function bottomRight(board: Board): CubePosition {
+  const z = board.height - 1;
+  return { x: z, z, y: 0 };
+}
+
+/** An unused disc that sits off `from` in `direction`. */
+export function findDisc(
+  discs: DiscSpot[],
+  from: CubePosition,
+  direction: HopDirection,
+): DiscSpot | undefined {
+  return discs.find(
+    (d) =>
+      !d.used &&
+      d.direction === direction &&
+      d.anchor.x === from.x &&
+      d.anchor.z === from.z &&
+      d.anchor.y === from.y,
+  );
+}
+
+/** Place classic side discs (left = north off x=0, right = west off x=z). */
+export function placeDiscs(height: number, count: number): DiscSpot[] {
+  const discs: DiscSpot[] = [];
+  const mid = Math.max(2, Math.floor(height * 0.5));
+  const low = Math.max(2, Math.floor(height * 0.72));
+  const high = Math.max(2, Math.floor(height * 0.32));
+  const rows = [mid, low, high].slice(0, Math.max(1, count));
+  rows.forEach((z, i) => {
+    const y = height - 1 - z;
+    if (i % 2 === 0) {
+      discs.push({
+        id: `disc-L${i}`,
+        anchor: { x: 0, z, y },
+        direction: "north",
+        active: false,
+        used: false,
+      });
+    } else {
+      discs.push({
+        id: `disc-R${i}`,
+        anchor: { x: z, z, y },
+        direction: "west",
+        active: false,
+        used: false,
+      });
+    }
+  });
+  // Always try to have at least one on each side when count >= 2.
+  if (count >= 2 && !discs.some((d) => d.direction === "west")) {
+    discs.push({
+      id: "disc-R",
+      anchor: { x: low, z: low, y: height - 1 - low },
+      direction: "west",
+      active: false,
+      used: false,
+    });
+  }
+  return discs.slice(0, count);
 }
 
 /** Create a fresh cube with default state. */
@@ -131,32 +238,7 @@ function makeCube(
   };
 }
 
-/** Assign special blocks to a handful of cubes for visual variety. */
-function sprinkleSpecials(cubes: Cube[], count: number): void {
-  const specials: SpecialBlock[] = [
-    "ice",
-    "sticky",
-    "teleporter",
-    "booster",
-    "multi",
-  ];
-  const pool = cubes.filter((cube) => cube.position.y > 0);
-  for (let i = 0; i < count && pool.length > 0; i++) {
-    const idx = Math.floor(Math.random() * pool.length);
-    const cube = pool.splice(idx, 1)[0];
-    cube.special = specials[Math.floor(Math.random() * specials.length)];
-  }
-}
-
-/**
- * Build a Q*bert-style triangle board.
- *
- * The valid cubes are exactly those with 0 <= x <= z <= height-1, and each
- * cube sits at layer y = height-1-z. The apex is the single cube at
- * (0, 0, height-1). Every cube is reachable from the apex via the four
- * diagonal hops, so the level is always completable. All shapes build this
- * same triangle so no cube is ever unreachable.
- */
+/** Build a classic triangular pyramid (28 cubes when height is 7). */
 function buildTriangle(level: Level): Board {
   const cubes: Record<string, Cube> = {};
   const height = level.height;
@@ -177,12 +259,7 @@ function buildTriangle(level: Level): Board {
 
 /** Build a board from a level definition. */
 export function buildBoard(level: Level): Board {
-  const board = buildTriangle(level);
-  // Sprinkle special blocks on later levels for escalating challenge.
-  const specialCount =
-    level.id >= 3 ? Math.min(4, Math.floor(level.id / 2)) : 0;
-  sprinkleSpecials(allCubes(board), specialCount);
-  return board;
+  return buildTriangle(level);
 }
 
 /** The default washed-out color for a fresh cube. */

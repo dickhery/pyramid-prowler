@@ -1,75 +1,85 @@
 /**
- * Scoring and combo logic for Pyramid Prowler.
- *
- * Points are awarded for color changes, gems, enemy lures, and level
- * completion. A combo multiplier builds as the player chains hops and lures
- * enemies, then decays when the player is idle.
+ * Scoring for Pyramid Prowler — values follow the 1982 arcade pyramid-hopper:
+ * 25 per color change (15 on the first step of a two-step cube), 500 for
+ * luring the snake off a disc, 100 for a green ball, 300 for catching a
+ * green gremlin, unused-disc bonus, and a rising stage-clear bonus.
  */
 import type { CubeColor } from "./types";
 
-/** Base points for painting a single cube. */
+/** Points for changing a cube to the target color. */
 export const PAINT_POINTS = 25;
 
-/** Base points for a gem, scaled by its value. */
+/** Points for the intermediate step of a two-hop cube. */
+export const MID_PAINT_POINTS = 15;
+
+/** Points for luring the chasing snake off a disc. */
+export const LURE_POINTS = 500;
+
+/** Points for catching a green ball (freezes enemies). */
+export const GREEN_BALL_POINTS = 100;
+
+/** Points for catching a green gremlin that undoes colors. */
+export const CATCH_UNDO_POINTS = 300;
+
+/** Points per unused disc at stage clear. */
+export const UNUSED_DISC_POINTS = 50;
+
+/** Stage-clear bonus starts here and climbs by STEP each stage. */
+export const LEVEL_CLEAR_BASE = 1000;
+export const LEVEL_CLEAR_STEP = 250;
+export const LEVEL_CLEAR_MAX = 5000;
+
+/** Extra life at this score (once per run). */
+export const EXTRA_LIFE_SCORE = 8000;
+
+/** Kept for older power-up / gem paths. */
 export const GEM_BASE = 100;
-
-/** Points for luring an enemy onto a disc. */
-export const LURE_POINTS = 200;
-
-/** Points for clearing a level. */
+export const POWERUP_POINTS = 150;
 export const LEVEL_CLEAR_POINTS = 1000;
 
-/** Points for collecting a power-up. */
-export const POWERUP_POINTS = 150;
-
-/** Seconds of idle time before the combo multiplier resets. */
 export const COMBO_WINDOW = 3;
-
-/** The maximum combo multiplier that can be reached. */
 export const MAX_COMBO = 8;
 
-/** Compute the score for painting a cube under the current combo. */
 export function paintScore(combo: number): number {
-  return PAINT_POINTS * comboMultiplier(combo);
+  return PAINT_POINTS * Math.max(1, comboMultiplier(combo));
 }
 
-/** Compute the score for collecting a gem under the current combo. */
+export function midPaintScore(): number {
+  return MID_PAINT_POINTS;
+}
+
 export function gemScore(value: number, combo: number): number {
-  return value * comboMultiplier(combo);
+  return value * Math.max(1, comboMultiplier(combo));
 }
 
-/** Compute the score for luring an enemy under the current combo. */
-export function lureScore(combo: number): number {
-  return LURE_POINTS * comboMultiplier(combo);
+export function lureScore(_combo: number): number {
+  return LURE_POINTS;
 }
 
-/** The multiplier applied for a given combo count. */
 export function comboMultiplier(combo: number): number {
-  return Math.min(combo, MAX_COMBO);
+  return Math.min(Math.max(combo, 1), MAX_COMBO);
 }
 
-/** Advance the combo after a successful action. */
 export function bumpCombo(combo: number): number {
   return Math.min(combo + 1, MAX_COMBO);
 }
 
-/** Decay the combo back toward zero over time. */
-export function decayCombo(
-  combo: number,
-  deltaTime: number,
-  comboTimer: number,
-): number {
-  if (combo <= 0) return 0;
-  const next = comboTimer - deltaTime;
-  if (next <= 0) return 0;
-  return combo;
+export function levelClearBonus(levelNumber: number): number {
+  return Math.min(
+    LEVEL_CLEAR_MAX,
+    LEVEL_CLEAR_BASE + Math.max(0, levelNumber - 1) * LEVEL_CLEAR_STEP,
+  );
 }
 
-/** A short human-readable label for a cube color (used in HUD copy). */
+export function unusedDiscBonus(unused: number, levelNumber: number): number {
+  const per = levelNumber >= 5 ? 100 : UNUSED_DISC_POINTS;
+  return unused * per;
+}
+
 export function colorLabel(color: CubeColor): string {
   switch (color) {
     case "target":
-      return "Teal";
+      return "Target";
     case "safe":
       return "Green";
     case "deadly":
@@ -83,6 +93,6 @@ export function colorLabel(color: CubeColor): string {
     case "teleporter":
       return "Teleporter";
     default:
-      return "Washed";
+      return "Start";
   }
 }

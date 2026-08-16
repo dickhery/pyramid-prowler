@@ -1,5 +1,5 @@
 import { useGameStore } from "@/game/store";
-import { Play, Settings } from "lucide-react";
+import { BookOpen, Play, Settings } from "lucide-react";
 
 /** Stable unique keys for the decorative background cubes (not array indices). */
 const DECO_KEYS = Array.from({ length: 25 }, (_, i) => `deco-${i}`);
@@ -40,6 +40,7 @@ export function PillButton({
 export function MainMenu() {
   const startGame = useGameStore((s) => s.startGame);
   const goToSettings = useGameStore((s) => s.goToSettings);
+  const goToHowTo = useGameStore((s) => s.goToHowTo);
 
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-gradient-pop px-6">
@@ -73,14 +74,14 @@ export function MainMenu() {
         </p>
 
         <p className="mt-6 max-w-md text-base leading-relaxed text-muted-foreground">
-          A mischievous color thief drained every cube of its hue, leaving the
-          great pyramid washed-out and grey. You are Prowler — a plucky orange
-          creature with a big nose and a bigger heart. Hop from cube to cube,
-          splash each one with the target color, and restore the pyramid&apos;s
-          brilliant glow before your discs run out.
+          A mischievous color thief drained every cube of its hue. You are
+          Prowler — hop diagonally across the pyramid, change every top face to
+          the target color, and dodge bouncing balls, a hatching snake, and
+          side-crawlers. Ride a floating disc back to the top if trouble closes
+          in.
         </p>
 
-        <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row">
+        <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:flex-wrap sm:justify-center">
           <PillButton
             dataOcid="menu.start_button"
             onClick={startGame}
@@ -88,6 +89,14 @@ export function MainMenu() {
           >
             <Play className="size-5 fill-current" />
             Start Hopping!
+          </PillButton>
+          <PillButton
+            dataOcid="menu.howto_button"
+            onClick={goToHowTo}
+            variant="secondary"
+          >
+            <BookOpen className="size-5" />
+            How to Play
           </PillButton>
           <PillButton
             dataOcid="menu.settings_button"
@@ -100,7 +109,7 @@ export function MainMenu() {
         </div>
 
         <p className="mt-8 font-mono text-xs uppercase tracking-widest text-muted-foreground">
-          Arrow keys / WASD to hop diagonally
+          Q / W / A / S or arrows — hop the four diagonals
         </p>
       </div>
     </div>

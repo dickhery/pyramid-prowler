@@ -2,47 +2,50 @@
  * Central type contracts for Pyramid Prowler.
  *
  * These types describe the board/pyramid grid, player hop movement, enemies,
- * power-ups, discs, gems, and levels. They are shared by the game store, the
- * 3D scene, and the HUD so every layer agrees on the same shapes.
+ * discs, and levels. They are shared by the game store, the 3D scene, and
+ * the HUD so every layer agrees on the same shapes.
  */
 
 /** A cube's color state on the pyramid. */
 export type CubeColor =
-  | "washed" // pale, needs painting
-  | "target" // matches the level's target color
-  | "safe" // green — safe to land on
-  | "deadly" // magenta/red — costs a life
-  | "ice" // slippery — slides an extra hop
-  | "sticky" // sticky — sticks for a beat
-  | "booster" // launches the player
-  | "teleporter"; // warps the player
+  | "washed"
+  | "target"
+  | "safe"
+  | "deadly"
+  | "ice"
+  | "sticky"
+  | "booster"
+  | "teleporter";
 
 /** A cube's special-block behaviour, independent of its visual color. */
 export type SpecialBlock =
   | "none"
-  | "ice" // slides an extra hop
-  | "sticky" // sticks for a beat
-  | "teleporter" // warps to another cube
-  | "booster" // launches an extra hop
-  | "multi"; // cycles through colors
+  | "ice"
+  | "sticky"
+  | "teleporter"
+  | "booster"
+  | "multi";
 
-/** The escalating color rule that governs how cubes get painted. */
-export type ColorRule =
-  | "oneHop" // one landing paints a cube
-  | "twoHop" // two landings paint a cube
-  | "flipBack" // re-stepping a painted cube unpaints it
-  | "timedDecay"; // painted cubes fade back over time
+/**
+ * How cubes change color when hopped on — matches the arcade stage rules:
+ * one landing, two landings, flip-back off the target, or two landings that
+ * also flip when hopped again.
+ */
+export type ColorRule = "oneHop" | "twoHop" | "flipBack" | "twoHopFlip";
 
 /** The layout shape of a level's board. */
 export type BoardShape = "pyramid" | "stepped" | "floating" | "rotating";
+
+/** Arcade difficulty used to scale spawn rate and enemy hop speed. */
+export type Difficulty = "easy" | "normal" | "hard";
 
 /** A single cube's position within the pyramid grid. */
 export interface CubePosition {
   /** Column index (x axis). */
   x: number;
-  /** Row index (z axis). */
+  /** Row index (z axis). 0 is the apex row. */
   z: number;
-  /** Layer / height index (y axis). */
+  /** Layer / height index (y axis). y = height - 1 - z. */
   y: number;
 }
 
@@ -54,11 +57,11 @@ export interface Cube {
   painted: boolean;
   /** The special-block behaviour of this cube. */
   special: SpecialBlock;
-  /** For twoHop rule: landings remaining before the cube paints. */
+  /** Landings remaining before the cube paints (two-hop rules). */
   paintProgress: number;
-  /** For timedDecay rule: seconds before a painted cube fades back. */
+  /** Unused (kept so older save shapes stay compatible). */
   decayTimer: number;
-  /** For multi special: current color-cycle index. */
+  /** Unused (kept so older save shapes stay compatible). */
   cycleIndex: number;
 }
 
@@ -66,85 +69,88 @@ export interface Cube {
 export interface Board {
   /** All cubes in the pyramid, keyed by "x,z,y". */
   cubes: Record<string, Cube>;
-  /** Number of columns along the x axis. */
   width: number;
-  /** Number of rows along the z axis. */
   depth: number;
-  /** Number of layers along the y axis. */
   height: number;
-  /** The layout shape used to build this board. */
   shape: BoardShape;
 }
 
-/** The four hop directions a player can move. */
+/**
+ * The four hop directions. Mapped to the isometric diagonals:
+ * north = up-left, west = up-right, east = down-left, south = down-right.
+ */
 export type HopDirection = "north" | "south" | "east" | "west";
 
 /** The player's current position and hop state. */
 export interface PlayerState {
   position: CubePosition;
-  /** True while a hop animation is in flight. */
   hopping: boolean;
-  /** The direction of the current hop, if any. */
   hopDirection: HopDirection | null;
-  /** Number of hops remaining in a multi-hop (booster/ice) move. */
   hopsRemaining: number;
-  /** 0..1 progress of the current hop animation. */
   hopProgress: number;
-  /** The position the current hop started from (for interpolation). */
   hopFrom: CubePosition;
-  /** The position the current hop is landing on. */
   hopTo: CubePosition;
-  /** True while the player is being transported by a floating disc. */
   ridingDisc: boolean;
-  /** Seconds remaining while riding a disc back to the top. */
   rideTimer: number;
-  /** True while the player is falling off the edge of the pyramid. */
+  /** World-space start of a disc ride (the disc itself). */
+  rideFrom: [number, number, number] | null;
   falling: boolean;
-  /** 0..1 progress of the fall animation. */
   fallProgress: number;
-  /** True while the player is stuck on a sticky cube. */
+  fallDirection: HopDirection | null;
   stuck: boolean;
-  /** Seconds remaining while stuck. */
   stuckTimer: number;
+  /** True while the player cannot hop (after a hit or fall). */
+  stunned: boolean;
+  stunTimer: number;
+  /** Seconds remaining to show the swear balloon. */
+  swearTimer: number;
 }
 
 /** The kinds of enemy that roam the pyramid. */
 export type EnemyKind =
-  | "eggSnake" // egg that hatches into a chasing snake
-  | "crawler" // side-crawling face enemy
-  | "undo" // green creature that reverses cube colors
-  | "fallingBall" // red deadly / green freezes enemies
-  | "drone" // modern chasing drone
-  | "blob"; // color-draining blob
+  | "eggSnake"
+  | "crawler"
+  | "undo"
+  | "fallingBall"
+  | "drone"
+  | "blob";
 
 /** The face of a cube an enemy is crawling on. */
 export type EnemyFace = "top" | "north" | "south" | "east" | "west";
+
+/** Roster entries used by the in-stage spawn timer. */
+export type SpawnKind =
+  | "redBall"
+  | "greenBall"
+  | "eggSnake"
+  | "undo"
+  | "crawlerLeft"
+  | "crawlerRight";
 
 /** A roaming enemy on the board. */
 export interface Enemy {
   id: string;
   kind: EnemyKind;
   position: CubePosition;
-  /** How many hops the enemy takes per player hop. */
   speed: number;
-  /** The color used to render the enemy. */
   color: CubeColor;
-  /** For eggSnake: true once the egg has hatched into a snake. */
   hatched: boolean;
-  /** For eggSnake: seconds until the egg hatches. */
   hatchTimer: number;
-  /** For fallingBall: green (freezes enemies) vs red (deadly). */
   frozen: boolean;
-  /** For blob: how much color it drains per step. */
   drainAmount: number;
-  /** For crawler: which cube face it is crawling on. */
   face: EnemyFace;
-  /** Movement timer accumulator (enemies move on a tick). */
   moveTimer: number;
-  /** True while the enemy is falling off a disc (for bonus points). */
   falling: boolean;
-  /** Seconds remaining while frozen by a freeze ray / green ball. */
+  fallProgress: number;
   frozenTimer: number;
+  hopping: boolean;
+  hopProgress: number;
+  hopFrom: CubePosition;
+  hopTo: CubePosition;
+  /** True when this hop leaves the pyramid (despawn on land). */
+  leaving: boolean;
+  /** Side-crawler travel sense: left = Ugg-like, right = Wrongway-like. */
+  crawlSense: "left" | "right" | null;
 }
 
 /** A collectible power-up sitting on a cube. */
@@ -154,7 +160,6 @@ export interface PowerUp {
   kind: PowerUpKind;
 }
 
-/** The kinds of power-up a player can collect. */
 export type PowerUpKind =
   | "extraLife"
   | "paintAll"
@@ -167,7 +172,6 @@ export type PowerUpKind =
   | "doubleJump"
   | "magnetDisc";
 
-/** The keys of every timed power-up effect. */
 export type EffectKey =
   | "shield"
   | "slowEnemies"
@@ -178,28 +182,27 @@ export type EffectKey =
   | "doubleJump"
   | "magnetDisc";
 
-/** The active power-up effects currently applied to the player. */
 export type ActivePowerUps = Record<EffectKey, boolean>;
 
-/** A collectible gem that boosts the score multiplier. */
 export interface Gem {
   id: string;
   position: CubePosition;
-  /** Base points awarded when collected. */
   value: number;
-  /** True once collected (removed from the board). */
   collected: boolean;
 }
 
-/** A floating disc that transports the player back to the top. */
+/**
+ * A floating disc beside the pyramid. Hopping off `anchor` in `direction`
+ * rides the disc back to the apex (and can lure a chasing snake off).
+ */
 export interface DiscSpot {
   id: string;
-  position: CubePosition;
-  /** True while the player is riding this disc. */
+  anchor: CubePosition;
+  direction: HopDirection;
   active: boolean;
+  used: boolean;
 }
 
-/** A transient visual effect queued for the rendering layer. */
 export interface Particle {
   id: string;
   position: CubePosition;
@@ -210,45 +213,44 @@ export interface Particle {
     | "enemyLure"
     | "paint"
     | "explosion";
-  /** CSS color used to tint the particle. */
   color: string;
-  /** Seconds remaining before the particle disappears. */
   life: number;
-  /** Total lifetime used for fade-out interpolation. */
   maxLife: number;
 }
 
-/** A single level definition. */
+/** A single level / stage definition. */
 export interface Level {
   id: number;
   name: string;
-  /** Board dimensions for this level. */
   width: number;
   depth: number;
   height: number;
-  /** The layout shape of the board. */
   shape: BoardShape;
-  /** The color every cube must reach to clear the level. */
   targetColor: CubeColor;
-  /** The color rule governing how cubes get painted. */
   colorRule: ColorRule;
-  /** Number of lives granted at the start of the level. */
   lives: number;
-  /** Number of discs (hops) available for this level. */
   discs: number;
-  /** Relative difficulty used to scale enemy speed and spawns. */
   difficulty: number;
-  /** Enemies that spawn on this level. */
   enemies: Enemy[];
-  /** Power-ups that spawn on this level. */
   powerUps: PowerUp[];
-  /** Gems that spawn on this level. */
   gems: Gem[];
-  /** Floating discs that transport the player back to the top. */
   discSpots: DiscSpot[];
+  /** Seconds between enemy spawns. */
+  spawnEvery: number;
+  /** Cycling spawn roster for this stage. */
+  spawnRoster: SpawnKind[];
+  /** Cap on simultaneous enemies. */
+  maxEnemies: number;
+  /** Seconds between enemy hops. */
+  enemyTick: number;
+  /** Top-face palette for this stage. */
+  washedHex: string;
+  midHex: string;
+  targetHex: string;
+  sideAHex: string;
+  sideBHex: string;
 }
 
-/** The overall game phase. */
 export type GamePhase =
   | "menu"
   | "playing"
@@ -256,8 +258,6 @@ export type GamePhase =
   | "levelclear"
   | "gameover";
 
-/** The top-level screen shown in the app shell. */
-export type Screen = "menu" | "game" | "settings";
+export type Screen = "menu" | "game" | "settings" | "howto";
 
-/** The active camera mode for the 3D scene. */
 export type CameraMode = "isometric" | "orbit";

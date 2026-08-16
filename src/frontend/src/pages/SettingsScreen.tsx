@@ -1,6 +1,5 @@
 import { useGameStore } from "@/game/store";
 import { ArrowLeft } from "lucide-react";
-import { useState } from "react";
 import { PillButton } from "./MainMenu";
 
 /** A labeled toggle switch used in the settings screen. */
@@ -52,14 +51,10 @@ export function SettingsScreen() {
   const goToMenu = useGameStore((s) => s.goToMenu);
   const cameraMode = useGameStore((s) => s.cameraMode);
   const setCameraMode = useGameStore((s) => s.setCameraMode);
-  const setPowerUp = useGameStore((s) => s.setPowerUp);
-  const slowEnemies = useGameStore((s) => s.powerUps.slowEnemies);
-
-  // Local-only preferences (not persisted in the store contract).
-  const [difficulty, setDifficulty] = useState<"Easy" | "Normal" | "Hard">(
-    "Normal",
-  );
-  const [sensitivity, setSensitivity] = useState(50);
+  const difficulty = useGameStore((s) => s.difficulty);
+  const setDifficulty = useGameStore((s) => s.setDifficulty);
+  const colorBlind = useGameStore((s) => s.colorBlind);
+  const setColorBlind = useGameStore((s) => s.setColorBlind);
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-pop px-6">
@@ -88,10 +83,10 @@ export function SettingsScreen() {
             dataOcid="settings.camera_toggle"
           />
           <ToggleRow
-            label="Color-blind mode"
-            hint="Adds patterns to distinguish cube colors"
-            checked={slowEnemies}
-            onChange={(value) => setPowerUp("slowEnemies", value)}
+            label="Color-blind patterns"
+            hint="Adds rings on cube tops so colors are easier to tell apart"
+            checked={colorBlind}
+            onChange={setColorBlind}
             dataOcid="settings.colorblind_toggle"
           />
         </div>
@@ -100,14 +95,17 @@ export function SettingsScreen() {
           <span className="font-display text-sm font-bold text-muted-foreground">
             Difficulty
           </span>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Changes how fast enemies hop and how often they spawn.
+          </p>
           <div className="mt-2 grid grid-cols-3 gap-2">
-            {(["Easy", "Normal", "Hard"] as const).map((option) => (
+            {(["easy", "normal", "hard"] as const).map((option) => (
               <button
                 key={option}
                 type="button"
-                data-ocid={`settings.difficulty.${option.toLowerCase()}`}
+                data-ocid={`settings.difficulty.${option}`}
                 onClick={() => setDifficulty(option)}
-                className={`rounded-full px-4 py-2 font-display text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                className={`rounded-full px-4 py-2 font-display text-sm font-bold capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                   difficulty === option
                     ? "bg-primary text-primary-foreground shadow-plastic-sm"
                     : "bg-secondary text-secondary-foreground hover:brightness-110"
@@ -117,27 +115,6 @@ export function SettingsScreen() {
               </button>
             ))}
           </div>
-        </div>
-
-        <div className="mt-6">
-          <div className="flex items-center justify-between">
-            <span className="font-display text-sm font-bold text-muted-foreground">
-              Camera sensitivity
-            </span>
-            <span className="font-mono text-sm font-bold text-foreground">
-              {sensitivity}
-            </span>
-          </div>
-          <input
-            type="range"
-            min={0}
-            max={100}
-            value={sensitivity}
-            data-ocid="settings.sensitivity"
-            aria-label="Camera sensitivity"
-            onChange={(e) => setSensitivity(Number(e.target.value))}
-            className="mt-3 w-full accent-primary"
-          />
         </div>
       </div>
     </div>

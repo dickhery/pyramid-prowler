@@ -1,16 +1,16 @@
 import { useGameStore } from "@/game/store";
 import type { Board, PlayerState } from "@/game/types";
+import { Html } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { useRef } from "react";
 import type * as THREE from "three";
-import { cubeCenter } from "./coords";
+import { discWorldPos, hopArc, hopWorldDelta, standOnTop } from "./coords";
 
 const ORANGE = "#ff8c42";
 const DARK_ORANGE = "#e06a1f";
 const BELLY = "#ffd9a8";
 const NOSE = "#ff6b3d";
 
-/** A single big eye: white sclera with a dark pupil. */
 function Eye({ side }: { side: number }) {
   return (
     <group position={[side * 0.16, 0.14, 0.3]}>
@@ -26,11 +26,9 @@ function Eye({ side }: { side: number }) {
   );
 }
 
-/** The cute two-legged orange creature with a big nose. */
 function CharacterBody({ scale }: { scale: [number, number, number] }) {
   return (
     <group scale={scale}>
-      {/* legs */}
       <mesh position={[-0.16, -0.42, 0.05]} castShadow>
         <sphereGeometry args={[0.12, 16, 16]} />
         <meshStandardMaterial color={DARK_ORANGE} roughness={0.6} />
@@ -39,20 +37,16 @@ function CharacterBody({ scale }: { scale: [number, number, number] }) {
         <sphereGeometry args={[0.12, 16, 16]} />
         <meshStandardMaterial color={DARK_ORANGE} roughness={0.6} />
       </mesh>
-      {/* body */}
       <mesh position={[0, 0, 0]} castShadow>
         <sphereGeometry args={[0.34, 24, 24]} />
         <meshStandardMaterial color={ORANGE} roughness={0.5} />
       </mesh>
-      {/* belly */}
       <mesh position={[0, -0.05, 0.18]}>
         <sphereGeometry args={[0.2, 20, 20]} />
         <meshStandardMaterial color={BELLY} roughness={0.6} />
       </mesh>
-      {/* eyes */}
       <Eye side={-1} />
       <Eye side={1} />
-      {/* big nose */}
       <mesh position={[0, -0.02, 0.34]}>
         <sphereGeometry args={[0.16, 20, 20]} />
         <meshStandardMaterial color={NOSE} roughness={0.4} />
@@ -61,22 +55,16 @@ function CharacterBody({ scale }: { scale: [number, number, number] }) {
   );
 }
 
-/** Ghost spheres trailing behind the character during a hop. */
 function Trail({ player, board }: { player: PlayerState; board: Board }) {
   if (!player.hopping) return null;
-  const from = cubeCenter(board, player.hopFrom);
-  const to = cubeCenter(board, player.hopTo);
+  const from = standOnTop(board, player.hopFrom);
+  const to = standOnTop(board, player.hopTo);
   const t = player.hopProgress;
-  const ghosts = [0.1, 0.2, 0.3].map((offset) => {
+  const ghosts = [0.12, 0.24, 0.36].map((offset) => {
     const gt = Math.max(0, t - offset);
-    const arc = Math.sin(gt * Math.PI) * 0.6;
     return {
       offset,
-      pos: [
-        from[0] + (to[0] - from[0]) * gt,
-        from[1] + (to[1] - from[1]) * gt + arc,
-        from[2] + (to[2] - from[2]) * gt,
-      ] as [number, number, number],
+      pos: hopArc(from, to, gt, 0.9),
     };
   });
   return (
@@ -95,10 +83,51 @@ function Trail({ player, board }: { player: PlayerState; board: Board }) {
   );
 }
 
-/** The player character, animated by the store's player state. */
+function playerWorldPos(
+  player: PlayerState,
+  board: Board,
+  discs: ReturnType<typeof useGameStore.getState>["discSpots"],
+): [number, number, number] {
+  if (player.hopping) {
+    return hopArc(
+      standOnTop(board, player.hopFrom),
+      standOnTop(board, player.hopTo),
+      player.hopProgress,
+      0.9,
+    );
+  }
+  if (player.falling) {
+    const base = standOnTop(board, player.position);
+    const dir = player.fallDirection ?? "south";
+    const [dx, , dz] = hopWorldDelta(dir);
+    const t = player.fallProgress;
+    return [
+      base[0] + dx * 0.7 * Math.min(1, t * 2),
+      base[1] - t * t * 7,
+      base[2] + dz * 0.7 * Math.min(1, t * 2),
+    ];
+  }
+  if (player.ridingDisc) {
+    const disc = discs.find((d) => d.active);
+    const from = disc
+      ? discWorldPos(board, disc)
+      : standOnTop(board, player.position);
+    const to = standOnTop(board, {
+      x: 0,
+      z: 0,
+      y: board.height - 1,
+    });
+    const t = 1 - player.rideTimer / 1.15;
+    const [x, y, z] = hopArc(from, to, Math.min(1, Math.max(0, t)), 2.1);
+    return [x, y + 0.15, z];
+  }
+  return standOnTop(board, player.position);
+}
+
 export function Character() {
   const player = useGameStore((s) => s.player);
   const board = useGameStore((s) => s.board);
+  const discs = useGameStore((s) => s.discSpots);
   const bounceRef = useRef<THREE.Group>(null);
 
   useFrame((state) => {
@@ -111,32 +140,17 @@ export function Character() {
     }
   });
 
-  let pos: [number, number, number];
   let scale: [number, number, number] = [1, 1, 1];
-
   if (player.hopping) {
-    const from = cubeCenter(board, player.hopFrom);
-    const to = cubeCenter(board, player.hopTo);
-    const t = player.hopProgress;
-    const arc = Math.sin(t * Math.PI) * 0.6;
-    pos = [
-      from[0] + (to[0] - from[0]) * t,
-      from[1] + (to[1] - from[1]) * t + arc,
-      from[2] + (to[2] - from[2]) * t,
-    ];
-    const stretch = 1 + Math.sin(t * Math.PI) * 0.25;
-    const squash = 1 - Math.sin(t * Math.PI) * 0.15;
+    const stretch = 1 + Math.sin(player.hopProgress * Math.PI) * 0.22;
+    const squash = 1 - Math.sin(player.hopProgress * Math.PI) * 0.12;
     scale = [squash, stretch, squash];
   } else if (player.falling) {
-    const base = cubeCenter(board, player.position);
-    pos = [base[0], base[1] - player.fallProgress * 3, base[2]];
-    scale = [1.1, 0.8, 1.1];
-  } else if (player.ridingDisc) {
-    const base = cubeCenter(board, player.position);
-    pos = [base[0], base[1] + player.rideTimer * 1.5, base[2]];
-  } else {
-    pos = cubeCenter(board, player.position);
+    scale = [1.12, 0.78, 1.12];
   }
+
+  const pos = playerWorldPos(player, board, discs);
+  const showSwear = player.swearTimer > 0;
 
   return (
     <group>
@@ -144,6 +158,13 @@ export function Character() {
       <group position={pos}>
         <group ref={bounceRef} rotation={[0, -Math.PI / 4, 0]}>
           <CharacterBody scale={scale} />
+          {showSwear && (
+            <Html position={[0.15, 0.72, 0.2]} center distanceFactor={8}>
+              <div className="rounded-xl bg-card/95 px-2 py-1 font-mono text-sm font-black text-foreground shadow-plastic-sm">
+                @!#?@!
+              </div>
+            </Html>
+          )}
         </group>
       </group>
     </group>

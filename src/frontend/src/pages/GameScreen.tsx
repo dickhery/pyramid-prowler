@@ -6,19 +6,66 @@ import { ArrowLeft, Camera, Pause, Play, RotateCcw } from "lucide-react";
 import { useEffect } from "react";
 import { PillButton } from "./MainMenu";
 
-/** Map keyboard input to the four diagonal hop directions. */
+/**
+ * Rotated-diamond mapping (classic 45° joystick):
+ *   Q / Left  = up-left   (north)
+ *   W / Up    = up-right  (west)
+ *   A / Down  = down-left (east)
+ *   S / Right / D = down-right (south)
+ */
 const KEY_DIRECTIONS: Record<string, HopDirection> = {
-  ArrowUp: "north",
-  KeyW: "north",
-  ArrowDown: "south",
+  KeyQ: "north",
+  ArrowLeft: "north",
+  KeyW: "west",
+  ArrowUp: "west",
+  KeyA: "east",
+  ArrowDown: "east",
   KeyS: "south",
-  ArrowRight: "east",
-  KeyD: "east",
-  ArrowLeft: "west",
-  KeyA: "west",
+  ArrowRight: "south",
+  KeyD: "south",
 };
 
-/** The full-viewport game screen: 3D scene with HUD and controls overlaid. */
+function HopPad() {
+  const hop = useGameStore((s) => s.hop);
+  const phase = useGameStore((s) => s.phase);
+  const disabled = phase !== "playing";
+
+  const btn = (dir: HopDirection, label: string, ocid: string, extra = "") => (
+    <button
+      type="button"
+      data-ocid={ocid}
+      aria-label={label}
+      disabled={disabled}
+      onPointerDown={(event) => {
+        event.preventDefault();
+        hop(dir);
+      }}
+      className={`flex size-14 items-center justify-center rounded-2xl bg-card/85 font-mono text-[10px] font-bold uppercase tracking-wide text-foreground shadow-plastic-sm backdrop-blur transition-transform hover:brightness-110 active:translate-y-0.5 disabled:opacity-40 ${extra}`}
+    >
+      {label}
+    </button>
+  );
+
+  return (
+    <div
+      className="pointer-events-auto absolute bottom-6 left-1/2 z-20 grid -translate-x-1/2 grid-cols-3 grid-rows-3 gap-2 sm:bottom-8"
+      data-ocid="game.hop_pad"
+    >
+      <div />
+      {btn("west", "Up-R", "game.hop.west")}
+      <div />
+      {btn("north", "Up-L", "game.hop.north")}
+      <div className="flex items-center justify-center font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+        hop
+      </div>
+      {btn("south", "Dn-R", "game.hop.south")}
+      <div />
+      {btn("east", "Dn-L", "game.hop.east")}
+      <div />
+    </div>
+  );
+}
+
 export function GameScreen() {
   const phase = useGameStore((s) => s.phase);
   const cameraMode = useGameStore((s) => s.cameraMode);
@@ -29,11 +76,13 @@ export function GameScreen() {
   const hop = useGameStore((s) => s.hop);
   const nextLevel = useGameStore((s) => s.nextLevel);
   const startGame = useGameStore((s) => s.startGame);
+  const score = useGameStore((s) => s.score);
+  const levelNumber = useGameStore((s) => s.levelNumber);
+  const levelName = useGameStore((s) => s.level.name);
 
   const toggleCamera = () =>
     setCameraMode(cameraMode === "isometric" ? "orbit" : "isometric");
 
-  // Wire keyboard controls for diagonal hopping.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const direction = KEY_DIRECTIONS[event.code];
@@ -44,7 +93,7 @@ export function GameScreen() {
       }
       if (event.code === "Escape") {
         if (phase === "paused") resumeGame();
-        else pauseGame();
+        else if (phase === "playing") pauseGame();
       }
     };
     window.addEventListener("keydown", onKeyDown);
@@ -54,11 +103,9 @@ export function GameScreen() {
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-background">
       <Scene />
-
       <HUD />
 
-      {/* Top-right control cluster */}
-      <div className="absolute right-4 top-4 z-20 flex items-center gap-2">
+      <div className="absolute bottom-6 right-4 z-20 flex flex-col items-end gap-2">
         <button
           type="button"
           data-ocid="game.camera_toggle"
@@ -95,16 +142,22 @@ export function GameScreen() {
         </button>
       </div>
 
-      {/* Pause overlay */}
+      {phase === "playing" && <HopPad />}
+
       {phase === "paused" && (
         <div
           data-ocid="game.pause_overlay"
           className="absolute inset-0 z-30 flex items-center justify-center bg-background/70 backdrop-blur-sm"
         >
-          <div className="flex flex-col items-center gap-6 rounded-3xl bg-card/90 p-10 shadow-plastic">
+          <div className="flex max-w-md flex-col items-center gap-6 rounded-3xl bg-card/90 p-10 shadow-plastic">
             <h2 className="font-display text-4xl font-black text-foreground">
               Paused
             </h2>
+            <p className="text-center text-sm text-muted-foreground">
+              Q / ← up-left · W / ↑ up-right · A / ↓ down-left · S / →
+              down-right. Hop off a pink disc to ride home. Do not hop off the
+              pyramid.
+            </p>
             <div className="flex flex-col items-center gap-3">
               <PillButton dataOcid="game.resume_button" onClick={resumeGame}>
                 <Play className="size-5 fill-current" />
@@ -123,7 +176,6 @@ export function GameScreen() {
         </div>
       )}
 
-      {/* Level-clear overlay */}
       {phase === "levelclear" && (
         <div
           data-ocid="game.levelclear_overlay"
@@ -131,14 +183,14 @@ export function GameScreen() {
         >
           <div className="flex flex-col items-center gap-6 rounded-3xl bg-card/90 p-10 text-center shadow-plastic">
             <span className="font-mono text-xs uppercase tracking-widest text-primary">
-              Level {useGameStore.getState().levelNumber} complete
+              {levelName} complete
             </span>
             <h2 className="font-display text-5xl font-black text-foreground text-shadow-pop">
               Level Clear!
             </h2>
             <p className="max-w-sm text-muted-foreground">
-              The pyramid glows with restored color. Onward to the next
-              washed-out wonder!
+              Every cube matches the target. Score {score.toLocaleString()}.
+              Next up: stage {levelNumber + 1}.
             </p>
             <PillButton dataOcid="game.next_level_button" onClick={nextLevel}>
               <Play className="size-5 fill-current" />
@@ -148,7 +200,6 @@ export function GameScreen() {
         </div>
       )}
 
-      {/* Game-over overlay */}
       {phase === "gameover" && (
         <div
           data-ocid="game.gameover_overlay"
@@ -156,14 +207,14 @@ export function GameScreen() {
         >
           <div className="flex flex-col items-center gap-6 rounded-3xl bg-card/90 p-10 text-center shadow-plastic">
             <span className="font-mono text-xs uppercase tracking-widest text-destructive">
-              Out of discs
+              Out of lives
             </span>
             <h2 className="font-display text-5xl font-black text-destructive text-shadow-pop">
               Game Over
             </h2>
             <p className="max-w-sm text-muted-foreground">
-              The color thief got the better of you this time. The pyramid
-              awaits another prowl!
+              Final score {score.toLocaleString()} on stage {levelNumber}. The
+              pyramid is still waiting.
             </p>
             <div className="flex flex-col items-center gap-3">
               <PillButton dataOcid="game.retry_button" onClick={startGame}>

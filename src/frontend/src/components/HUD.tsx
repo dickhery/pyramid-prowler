@@ -1,17 +1,17 @@
+import { remainingCubes } from "@/game/board";
 import { useGameStore } from "@/game/store";
 import { Disc3, Heart, Layers, Target } from "lucide-react";
 
-/** Zero-pad a number to a fixed width for the score readout. */
 function pad(value: number, width = 6): string {
   return String(value).padStart(width, "0");
 }
 
-/** A row of hearts representing the player's remaining lives. */
 function Lives() {
   const lives = useGameStore((s) => s.lives);
+  const shown = Math.min(lives, 6);
   return (
     <div className="flex items-center gap-1" aria-label={`${lives} lives`}>
-      {Array.from({ length: 3 }).map((_, i) => (
+      {Array.from({ length: Math.max(shown, 3) }).map((_, i) => (
         <Heart
           key={`heart-${i + 1}`}
           data-ocid={`hud.life.${i + 1}`}
@@ -20,19 +20,17 @@ function Lives() {
           }`}
         />
       ))}
+      {lives > 6 && (
+        <span className="font-mono text-xs font-bold text-foreground">
+          +{lives - 6}
+        </span>
+      )}
     </div>
   );
 }
 
-/** The target color swatch the player must paint every cube to. */
 function TargetSwatch() {
-  const targetColor = useGameStore((s) => s.targetColor);
-  const swatch =
-    targetColor === "safe"
-      ? "#4cd964"
-      : targetColor === "deadly"
-        ? "#e14b8a"
-        : "#30d5c8";
+  const level = useGameStore((s) => s.level);
   return (
     <div
       className="flex items-center gap-2"
@@ -41,17 +39,16 @@ function TargetSwatch() {
     >
       <Target className="size-4 text-muted-foreground" />
       <span
-        className="size-5 rounded-full border-2 border-white/20 shadow-plastic-sm"
-        style={{ backgroundColor: swatch }}
+        className="size-5 rounded-sm border-2 border-white/20 shadow-plastic-sm"
+        style={{ backgroundColor: level.targetHex }}
       />
       <span className="font-mono text-xs text-muted-foreground">TARGET</span>
     </div>
   );
 }
 
-/** The remaining discs (hops) readout. */
 function Discs() {
-  const discs = useGameStore((s) => s.discs);
+  const discs = useGameStore((s) => s.discSpots.filter((d) => !d.used).length);
   return (
     <div
       className="flex items-center gap-2"
@@ -66,7 +63,6 @@ function Discs() {
   );
 }
 
-/** The current level number readout. */
 function Level() {
   const levelNumber = useGameStore((s) => s.levelNumber);
   return (
@@ -83,14 +79,30 @@ function Level() {
   );
 }
 
-/** A combo multiplier overlay shown while the player chains hops. */
+function Remaining() {
+  const board = useGameStore((s) => s.board);
+  const left = remainingCubes(board);
+  return (
+    <div
+      className="flex items-center gap-2"
+      data-ocid="hud.remaining"
+      aria-label={`${left} cubes left`}
+    >
+      <span className="font-mono text-xs text-muted-foreground">LEFT</span>
+      <span className="font-mono text-sm font-bold text-foreground">
+        {left}
+      </span>
+    </div>
+  );
+}
+
 function Combo() {
   const combo = useGameStore((s) => s.combo);
   if (combo < 2) return null;
   return (
     <div
       data-ocid="hud.combo"
-      className="pointer-events-none absolute left-1/2 top-1/3 -translate-x-1/2 animate-pop-in"
+      className="pointer-events-none absolute left-1/2 top-[28%] -translate-x-1/2 animate-pop-in"
     >
       <span className="font-display text-4xl font-extrabold text-accent text-shadow-pop">
         x{combo}
@@ -99,9 +111,19 @@ function Combo() {
   );
 }
 
-/**
- * The clean, unobtrusive HUD positioned over the 3D canvas.
- */
+function Status() {
+  const message = useGameStore((s) => s.message);
+  const phase = useGameStore((s) => s.phase);
+  if (!message || phase !== "playing") return null;
+  return (
+    <div className="pointer-events-none absolute left-1/2 top-20 -translate-x-1/2">
+      <span className="rounded-full bg-card/80 px-4 py-1 font-display text-sm font-bold text-foreground shadow-plastic-sm backdrop-blur">
+        {message}
+      </span>
+    </div>
+  );
+}
+
 export function HUD() {
   const score = useGameStore((s) => s.score);
 
@@ -128,11 +150,17 @@ export function HUD() {
         <div className="rounded-2xl bg-card/80 px-4 py-2 shadow-plastic-sm backdrop-blur">
           <TargetSwatch />
         </div>
-        <div className="rounded-2xl bg-card/80 px-4 py-2 shadow-plastic-sm backdrop-blur">
-          <Discs />
+        <div className="flex gap-2">
+          <div className="rounded-2xl bg-card/80 px-3 py-2 shadow-plastic-sm backdrop-blur">
+            <Discs />
+          </div>
+          <div className="rounded-2xl bg-card/80 px-3 py-2 shadow-plastic-sm backdrop-blur">
+            <Remaining />
+          </div>
         </div>
       </div>
 
+      <Status />
       <Combo />
     </div>
   );

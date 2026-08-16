@@ -1,146 +1,75 @@
 import { useGameStore } from "@/game/store";
-import type { DiscSpot, Gem, PowerUp } from "@/game/types";
+import type { DiscSpot } from "@/game/types";
 import { OrbitControls } from "@react-three/drei";
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useRef } from "react";
-import type * as THREE from "three";
+import * as THREE from "three";
 import { Character } from "./Character";
 import { Effects, ScreenShake } from "./Effects";
 import { EnemyModels } from "./EnemyModels";
 import { Pyramid } from "./Pyramid";
-import { cubeCenter } from "./coords";
+import { CUBE_SIZE, discWorldPos, pyramidFocus } from "./coords";
 
-/** A soft ground plane that catches shadows. */
 function Ground() {
   return (
     <mesh
       rotation={[-Math.PI / 2, 0, 0]}
-      position={[0, -0.01, 0]}
+      position={[0, -0.02, 2]}
       receiveShadow
     >
-      <planeGeometry args={[40, 40]} />
-      <meshStandardMaterial color="#14142e" roughness={1} metalness={0} />
+      <planeGeometry args={[48, 48]} />
+      <meshStandardMaterial color="#12122a" roughness={1} metalness={0} />
     </mesh>
   );
 }
 
-/** A collectible gem that sparkles and bobs above its cube. */
-function GemMesh({ gem }: { gem: Gem }) {
-  const ref = useRef<THREE.Mesh>(null);
-  const board = useGameStore((s) => s.board);
-  const base = cubeCenter(board, gem.position);
-
-  useFrame((state) => {
-    const mesh = ref.current;
-    if (!mesh) return;
-    const t = state.clock.elapsedTime;
-    mesh.position.set(base[0], base[1] + 0.5 + Math.sin(t * 3) * 0.12, base[2]);
-    mesh.rotation.y = t * 1.5;
-    mesh.rotation.x = Math.sin(t * 2) * 0.3;
-  });
-
-  return (
-    <mesh ref={ref} position={[base[0], base[1] + 0.5, base[2]]} castShadow>
-      <octahedronGeometry args={[0.18, 0]} />
-      <meshStandardMaterial
-        color="#ffd54a"
-        emissive="#ffd54a"
-        emissiveIntensity={1.2}
-        roughness={0.2}
-        metalness={0.4}
-      />
-    </mesh>
-  );
-}
-
-/** A collectible power-up floating above its cube. */
-function PowerUpMesh({ powerUp }: { powerUp: PowerUp }) {
-  const ref = useRef<THREE.Mesh>(null);
-  const board = useGameStore((s) => s.board);
-  const base = cubeCenter(board, powerUp.position);
-
-  useFrame((state) => {
-    const mesh = ref.current;
-    if (!mesh) return;
-    const t = state.clock.elapsedTime;
-    mesh.position.set(
-      base[0],
-      base[1] + 0.55 + Math.sin(t * 2.5) * 0.1,
-      base[2],
-    );
-    mesh.rotation.y = t * 1.2;
-  });
-
-  return (
-    <mesh ref={ref} position={[base[0], base[1] + 0.55, base[2]]} castShadow>
-      <icosahedronGeometry args={[0.16, 0]} />
-      <meshStandardMaterial
-        color="#30d5c8"
-        emissive="#30d5c8"
-        emissiveIntensity={0.9}
-        roughness={0.25}
-        metalness={0.3}
-      />
-    </mesh>
-  );
-}
-
-/** A floating disc that transports the player back to the top. */
 function DiscMesh({ disc }: { disc: DiscSpot }) {
   const ref = useRef<THREE.Mesh>(null);
   const board = useGameStore((s) => s.board);
-  const base = cubeCenter(board, disc.position);
+  const base = discWorldPos(board, disc);
 
   useFrame((state) => {
     const mesh = ref.current;
     if (!mesh) return;
     const t = state.clock.elapsedTime;
-    mesh.position.set(
-      base[0],
-      base[1] + 0.35 + Math.sin(t * 2) * 0.08,
-      base[2],
-    );
-    mesh.rotation.z = t * 0.8;
+    if (disc.active) {
+      mesh.visible = false;
+      return;
+    }
+    mesh.visible = true;
+    mesh.position.set(base[0], base[1] + Math.sin(t * 2.2) * 0.07, base[2]);
+    mesh.rotation.y = t * 1.1;
   });
 
   return (
-    <mesh ref={ref} position={[base[0], base[1] + 0.35, base[2]]} castShadow>
-      <cylinderGeometry args={[0.34, 0.34, 0.06, 24]} />
-      <meshStandardMaterial
-        color="#30d5c8"
-        emissive="#30d5c8"
-        emissiveIntensity={0.8}
-        roughness={0.3}
-        metalness={0.2}
-      />
-    </mesh>
-  );
-}
-
-/** The collectibles and discs floating above the pyramid. */
-function Collectibles() {
-  const gems = useGameStore((s) => s.gems);
-  const powerUpItems = useGameStore((s) => s.powerUpItems);
-  const discSpots = useGameStore((s) => s.discSpots);
-
-  return (
     <group>
-      {gems
-        .filter((g) => !g.collected)
-        .map((g) => (
-          <GemMesh key={g.id} gem={g} />
-        ))}
-      {powerUpItems.map((p) => (
-        <PowerUpMesh key={p.id} powerUp={p} />
-      ))}
-      {discSpots.map((d) => (
-        <DiscMesh key={d.id} disc={d} />
-      ))}
+      <mesh ref={ref} position={base} castShadow rotation={[0, 0, 0]}>
+        <cylinderGeometry args={[0.32, 0.32, 0.07, 24]} />
+        <meshStandardMaterial
+          color="#ff6bd6"
+          emissive="#ff6bd6"
+          emissiveIntensity={0.7}
+          roughness={0.28}
+          metalness={0.25}
+        />
+      </mesh>
     </group>
   );
 }
 
-/** Drives the game loop: ticks the engine's update with the frame delta. */
+function Collectibles() {
+  const discSpots = useGameStore((s) => s.discSpots);
+  return (
+    <group>
+      {discSpots
+        .filter((d) => !d.used)
+        .map((d) => (
+          <DiscMesh key={d.id} disc={d} />
+        ))}
+    </group>
+  );
+}
+
 function GameLoop() {
   const update = useGameStore((s) => s.update);
   useFrame((_, delta) => {
@@ -149,35 +78,66 @@ function GameLoop() {
   return null;
 }
 
-/**
- * The primary 3D scene: an isometric camera by default with a toggleable
- * free-orbit camera, soft lighting, and the full pyramid world composed of
- * the board, character, enemies, collectibles, and effects.
- */
+function CameraRig() {
+  const cameraMode = useGameStore((s) => s.cameraMode);
+  const board = useGameStore((s) => s.board);
+  const { camera } = useThree();
+  const target = useRef(new THREE.Vector3());
+  const dest = useRef(new THREE.Vector3());
+
+  useFrame(() => {
+    if (cameraMode !== "isometric") return;
+    const [fx, fy, fz] = pyramidFocus(board);
+    target.current.set(fx, fy, fz);
+    dest.current.set(fx + 8.2, fy + 9.4, fz + 8.2);
+    camera.position.lerp(dest.current, 0.14);
+    camera.lookAt(target.current);
+  });
+  return null;
+}
+
 export function Scene() {
   const cameraMode = useGameStore((s) => s.cameraMode);
+  const height = useGameStore((s) => s.board.height);
+  const [fx, fy, fz] = [
+    0,
+    height * CUBE_SIZE * 0.36,
+    height * CUBE_SIZE * 0.18,
+  ];
 
   return (
     <Canvas
       shadows
       dpr={[1, 2]}
-      camera={
-        cameraMode === "isometric"
-          ? { position: [10, 12, 10], fov: 40, near: 0.1, far: 100 }
-          : { position: [8, 6, 8], fov: 50, near: 0.1, far: 100 }
-      }
+      camera={{
+        position: [fx + 8.2, fy + 9.4, fz + 8.2],
+        fov: 38,
+        near: 0.1,
+        far: 80,
+      }}
+      onCreated={({ camera }) => {
+        camera.lookAt(fx, fy, fz);
+      }}
     >
-      <ambientLight intensity={0.55} />
+      <color attach="background" args={["#14122c"]} />
+      <ambientLight intensity={0.52} />
       <directionalLight
         position={[8, 14, 6]}
-        intensity={1.1}
+        intensity={1.15}
         castShadow
         shadow-mapSize-width={1024}
         shadow-mapSize-height={1024}
+        shadow-camera-far={40}
+        shadow-camera-left={-12}
+        shadow-camera-right={12}
+        shadow-camera-top={12}
+        shadow-camera-bottom={-12}
       />
-      <directionalLight position={[-6, 4, -6]} intensity={0.35} />
+      <directionalLight position={[-6, 4, -4]} intensity={0.32} />
+      <hemisphereLight args={["#7a88c8", "#1a1630", 0.28]} />
 
       <GameLoop />
+      <CameraRig />
       <ScreenShake />
       <Pyramid />
       <Character />
@@ -189,9 +149,10 @@ export function Scene() {
       {cameraMode === "orbit" && (
         <OrbitControls
           enablePan={false}
-          minDistance={6}
+          minDistance={7}
           maxDistance={22}
-          maxPolarAngle={Math.PI / 2.2}
+          maxPolarAngle={Math.PI / 2.15}
+          target={[fx, fy, fz]}
         />
       )}
     </Canvas>

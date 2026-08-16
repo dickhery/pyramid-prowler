@@ -1,79 +1,88 @@
 import {
   apex,
   buildBoard,
+  findDisc,
   getCube,
   isBoardPainted,
   keyOf,
   neighbor,
 } from "./board";
 import {
-  ENEMY_TICK,
+  ENEMY_HOP_TIME,
+  FREEZE_TIME,
   applyEnemyEffect,
+  beginEnemyHop,
+  chooseEnemyHop,
   collidesWithPlayer,
+  freezeEnemies,
+  isCatchable,
   isDeadly,
-  setCube,
-  stepEnemy,
-  teleportDestination,
+  landEnemy,
+  lureEnemy,
+  spawnFromRoster,
 } from "./enemies";
 import { getLevel } from "./levels";
 import {
-  activateEffect,
-  effectForKind,
   emptyActivePowerUps,
   emptyEffectTimers,
   isInvincible,
   tickEffects,
 } from "./powerups";
 import {
-  LEVEL_CLEAR_POINTS,
-  POWERUP_POINTS,
-  bumpCombo,
-  gemScore,
+  CATCH_UNDO_POINTS,
+  EXTRA_LIFE_SCORE,
+  GREEN_BALL_POINTS,
+  LURE_POINTS,
+  levelClearBonus,
+  midPaintScore,
   paintScore,
+  unusedDiscBonus,
 } from "./scoring";
 import type { GameState } from "./store";
-/**
- * The game loop for Pyramid Prowler.
- *
- * Pure TypeScript operating on the zustand store. `startLevel` builds a fresh
- * level, `hop` initiates diagonal movement, and `update` advances animations,
- * enemies, effects, color decay, and win/lose detection. No three.js here —
- * the rendering layer reads the resulting state from the store.
- */
 import type {
   Board,
   Cube,
-  CubeColor,
-  CubePosition,
-  Enemy,
-  Gem,
+  Difficulty,
+  DiscSpot,
   HopDirection,
   Particle,
   PlayerState,
-  PowerUp,
 } from "./types";
 
-/** Hops per second for the hop animation. */
-const HOP_SPEED = 8;
+/** Hops per second for the player hop animation. */
+const HOP_SPEED = 4.6;
 /** Fall animation speed (0..1 progress per second). */
-const FALL_SPEED = 2;
+const FALL_SPEED = 1.35;
 /** Seconds to ride a floating disc back to the top. */
-const RIDE_TIME = 1.2;
-/** Seconds the player is stuck on a sticky cube. */
-const STICK_TIME = 1.0;
-/** Seconds a painted cube stays painted under timedDecay. */
-const DECAY_TIME = 6;
-/** Seconds per color cycle on a multi cube. */
-const MULTI_CYCLE = 1.5;
+const RIDE_TIME = 1.15;
 /** Seconds of shake after a fall or hit. */
-const SHAKE_DURATION = 0.5;
-/** Seconds of idle before the combo resets. */
-const COMBO_WINDOW = 3;
-/** The colors a multi cube cycles through. */
-const MULTI_COLORS: CubeColor[] = ["target", "safe", "deadly", "ice"];
+const SHAKE_DURATION = 0.45;
+/** Stun after a hit (cannot hop). */
+const HIT_STUN = 1.4;
+/** Stun after respawning from a fall. */
+const FALL_STUN = 0.7;
+/** Swear balloon duration. */
+const SWEAR_TIME = 1.1;
+/** First-spawn delay so the player can start painting. */
+const SPAWN_GRACE = 2.2;
 
-/** Build a fresh player state standing on a given cube. */
-function emptyPlayer(position: CubePosition): PlayerState {
+const DIFFICULTY_SPAWN: Record<Difficulty, number> = {
+  easy: 1.35,
+  normal: 1,
+  hard: 0.72,
+};
+const DIFFICULTY_TICK: Record<Difficulty, number> = {
+  easy: 1.25,
+  normal: 1,
+  hard: 0.78,
+};
+
+export interface SessionCarry {
+  lives: number;
+  extraLifeAwarded: boolean;
+}
+
+function emptyPlayer(position: CubePositionLike): PlayerState {
   return {
     position,
     hopping: false,
@@ -84,32 +93,36 @@ function emptyPlayer(position: CubePosition): PlayerState {
     hopTo: position,
     ridingDisc: false,
     rideTimer: 0,
+    rideFrom: null,
     falling: false,
     fallProgress: 0,
+    fallDirection: null,
     stuck: false,
     stuckTimer: 0,
+    stunned: false,
+    stunTimer: 0,
+    swearTimer: 0,
   };
 }
 
-/** Deep-clone enemies so level definitions are never mutated. */
-function cloneEnemies(enemies: Enemy[]): Enemy[] {
-  return enemies.map((e) => ({ ...e, position: { ...e.position } }));
-}
+type CubePositionLike = PlayerState["position"];
 
-/** Add points to the score. */
 function addScore(state: GameState, points: number): GameState {
-  return { ...state, score: state.score + points };
+  const score = state.score + points;
+  let extraLifeAwarded = state.extraLifeAwarded;
+  let lives = state.lives;
+  let message = state.message;
+  if (!extraLifeAwarded && score >= EXTRA_LIFE_SCORE) {
+    extraLifeAwarded = true;
+    lives += 1;
+    message = "Extra Life!";
+  }
+  return { ...state, score, extraLifeAwarded, lives, message };
 }
 
-/** Bump the combo and refresh its decay window. */
-function bumpComboState(state: GameState): GameState {
-  return { ...state, combo: bumpCombo(state.combo), comboTimer: COMBO_WINDOW };
-}
-
-/** Queue a transient particle for the rendering layer. */
 function addParticle(
   state: GameState,
-  position: CubePosition,
+  position: CubePositionLike,
   kind: Particle["kind"],
   color: string,
 ): GameState {
@@ -118,366 +131,384 @@ function addParticle(
     position,
     kind,
     color,
-    life: 0.6,
-    maxLife: 0.6,
+    life: 0.55,
+    maxLife: 0.55,
   };
   return { ...state, particles: [...state.particles, particle] };
 }
 
-/** Apply the level's color rule to a cube the player just landed on. */
 function applyColorRule(
   board: Board,
   cube: Cube,
   rule: GameState["level"]["colorRule"],
-): Board {
-  if (cube.painted) {
-    // flipBack: re-stepping a painted cube unpaints it.
-    if (rule === "flipBack") {
-      return setCube(board, cube, {
-        ...cube,
-        painted: false,
-        color: "washed",
-        paintProgress: 1,
-      });
-    }
-    return board;
-  }
-  switch (rule) {
-    case "oneHop":
-      return setCube(board, cube, {
+): { board: Board; paintedNow: boolean; midNow: boolean } {
+  const set = (updated: Cube): Board => ({
+    ...board,
+    cubes: { ...board.cubes, [keyOf(cube.position)]: updated },
+  });
+
+  if (rule === "oneHop") {
+    if (cube.painted) return { board, paintedNow: false, midNow: false };
+    return {
+      board: set({
         ...cube,
         painted: true,
         color: "target",
         paintProgress: 0,
-      });
-    case "twoHop": {
-      const next = cube.paintProgress - 1;
-      if (next <= 0) {
-        return setCube(board, cube, {
+      }),
+      paintedNow: true,
+      midNow: false,
+    };
+  }
+
+  if (rule === "twoHop") {
+    if (cube.painted) return { board, paintedNow: false, midNow: false };
+    const next = cube.paintProgress - 1;
+    if (next <= 0) {
+      return {
+        board: set({
           ...cube,
           painted: true,
           color: "target",
           paintProgress: 0,
-        });
-      }
-      return setCube(board, cube, { ...cube, paintProgress: next });
+        }),
+        paintedNow: true,
+        midNow: false,
+      };
     }
-    case "flipBack":
-      return setCube(board, cube, {
-        ...cube,
-        painted: true,
-        color: "target",
-        paintProgress: 0,
-      });
-    case "timedDecay":
-      return setCube(board, cube, {
-        ...cube,
-        painted: true,
-        color: "target",
-        paintProgress: 0,
-        decayTimer: DECAY_TIME,
-      });
-  }
-}
-
-/** Paint every cube on the board (paintAll power-up). */
-function paintAll(board: Board, target: CubeColor): Board {
-  const cubes: Record<string, Cube> = {};
-  for (const k of Object.keys(board.cubes)) {
-    cubes[k] = {
-      ...board.cubes[k],
-      painted: true,
-      color: target,
-      paintProgress: 0,
+    return {
+      board: set({ ...cube, paintProgress: next, color: "washed" }),
+      paintedNow: false,
+      midNow: true,
     };
   }
-  return { ...board, cubes };
+
+  if (rule === "flipBack") {
+    if (cube.painted) {
+      return {
+        board: set({
+          ...cube,
+          painted: false,
+          color: "washed",
+          paintProgress: 1,
+        }),
+        paintedNow: false,
+        midNow: false,
+      };
+    }
+    return {
+      board: set({
+        ...cube,
+        painted: true,
+        color: "target",
+        paintProgress: 0,
+      }),
+      paintedNow: true,
+      midNow: false,
+    };
+  }
+
+  // twoHopFlip: 2 → 1 (mid) → 0 (target) → 2 (washed)
+  if (cube.painted) {
+    return {
+      board: set({
+        ...cube,
+        painted: false,
+        color: "washed",
+        paintProgress: 2,
+      }),
+      paintedNow: false,
+      midNow: false,
+    };
+  }
+  const next = cube.paintProgress - 1;
+  if (next <= 0) {
+    return {
+      board: set({
+        ...cube,
+        painted: true,
+        color: "target",
+        paintProgress: 0,
+      }),
+      paintedNow: true,
+      midNow: false,
+    };
+  }
+  return {
+    board: set({ ...cube, paintProgress: next, color: "washed" }),
+    paintedNow: false,
+    midNow: true,
+  };
 }
 
-/** Lose a life, shake the screen, and detect game over. */
-function damage(state: GameState): GameState {
+function clearHazards(state: GameState): GameState {
+  return {
+    ...state,
+    enemies: [],
+    spawnTimer: SPAWN_GRACE,
+  };
+}
+
+function loseLife(state: GameState, message: string): GameState {
   const lives = state.lives - 1;
-  let s: GameState = {
+  if (lives <= 0) {
+    return {
+      ...state,
+      lives: 0,
+      phase: "gameover",
+      message: "Game Over",
+      shake: SHAKE_DURATION,
+      player: { ...state.player, swearTimer: SWEAR_TIME },
+    };
+  }
+  return {
     ...state,
     lives,
+    message,
     shake: SHAKE_DURATION,
-    message: "Ouch!",
+    player: { ...state.player, swearTimer: SWEAR_TIME },
   };
-  if (lives <= 0) {
-    s = { ...s, phase: "gameover", message: "Game Over" };
-  }
-  return s;
 }
 
-/** Start a fall off the edge: lose a life and animate the drop. */
-function startFall(state: GameState): GameState {
-  let s = damage(state);
-  if (s.phase === "gameover") return s;
+function startFall(state: GameState, direction: HopDirection): GameState {
+  let s = loseLife(state, "Fell off!");
   return {
     ...s,
     player: {
       ...s.player,
       falling: true,
       fallProgress: 0,
+      fallDirection: direction,
       hopping: false,
-      stuck: false,
+      ridingDisc: false,
+      stunned: true,
+      stunTimer: 99,
     },
   };
 }
 
-/** Collect a power-up at the player's position. */
-function collectPowerUp(state: GameState, pu: PowerUp): GameState {
-  let s = addScore(state, POWERUP_POINTS);
-  s = addParticle(s, pu.position, "gem", "#ffd54a");
-  const key = effectForKind(pu.kind);
-  if (key) {
-    const { active, timers } = activateEffect(s.powerUps, s.effectTimers, key);
-    s = { ...s, powerUps: active, effectTimers: timers };
-  } else if (pu.kind === "extraLife") {
-    s = { ...s, lives: s.lives + 1, message: "+1 Life!" };
-  } else if (pu.kind === "paintAll") {
-    s = {
+function hitPlayer(state: GameState): GameState {
+  let s = loseLife(state, "@!#?@!");
+  if (s.phase === "gameover") {
+    return {
       ...s,
-      board: paintAll(s.board, s.level.targetColor),
-      message: "All painted!",
+      player: { ...s.player, swearTimer: SWEAR_TIME, hopping: false },
     };
   }
-  return { ...s, powerUpItems: s.powerUpItems.filter((p) => p.id !== pu.id) };
-}
-
-/** Collect a gem at the player's position. */
-function collectGem(state: GameState, gem: Gem): GameState {
-  let s = addScore(state, gemScore(gem.value, state.combo));
-  s = bumpComboState(s);
-  s = addParticle(s, gem.position, "gem", "#ffd54a");
+  s = clearHazards(s);
   return {
-    ...s,
-    gems: s.gems.map((g) => (g.id === gem.id ? { ...g, collected: true } : g)),
-  };
-}
-
-/** Start riding a floating disc back to the top. */
-function startRide(state: GameState, discIndex: number): GameState {
-  const disc = state.discSpots[discIndex];
-  const discs = Math.max(0, state.discs - 1);
-  let s: GameState = {
-    ...state,
-    discs,
-    discSpots: state.discSpots.map((d, i) =>
-      i === discIndex ? { ...d, active: true } : d,
-    ),
-  };
-  s = {
     ...s,
     player: {
       ...s.player,
-      ridingDisc: true,
-      rideTimer: RIDE_TIME,
       hopping: false,
+      hopProgress: 0,
+      stunned: true,
+      stunTimer: HIT_STUN,
+      swearTimer: SWEAR_TIME,
     },
   };
-  s = addParticle(s, disc.position, "enemyLure", "#30d5c8");
-  return s;
 }
 
-/** Check for a deadly enemy collision and apply its consequence. */
-function checkCollision(state: GameState): GameState {
-  const deadly = state.enemies.find(
-    (e) => collidesWithPlayer(e, state.player) && isDeadly(e),
+function resolveContact(state: GameState): GameState {
+  const occupant = state.enemies.find((e) =>
+    collidesWithPlayer(e, state.player),
   );
-  if (!deadly) return state;
-  if (isInvincible(state.powerUps)) {
-    return {
+  if (!occupant) return state;
+
+  if (isCatchable(occupant)) {
+    let s: GameState = {
       ...state,
-      enemies: state.enemies.filter((e) => e.id !== deadly.id),
-      message: "Invincible!",
+      enemies: state.enemies.filter((e) => e.id !== occupant.id),
     };
+    if (occupant.kind === "undo") {
+      s = addScore(s, CATCH_UNDO_POINTS);
+      s = { ...s, message: "+300" };
+    } else {
+      s = addScore(s, GREEN_BALL_POINTS);
+      s = {
+        ...s,
+        enemies: freezeEnemies(s.enemies, FREEZE_TIME),
+        message: "Freeze!",
+      };
+    }
+    return addParticle(s, occupant.position, "gem", "#4cd964");
   }
-  return startFall(state);
+
+  if (isDeadly(occupant)) {
+    if (isInvincible(state.powerUps)) {
+      return {
+        ...state,
+        enemies: state.enemies.filter((e) => e.id !== occupant.id),
+        message: "Invincible!",
+      };
+    }
+    return hitPlayer(state);
+  }
+  return state;
 }
 
-/** Apply every landing effect for the cube the player reached. */
 function applyLanding(state: GameState): GameState {
   const pos = state.player.hopTo;
   const cube = getCube(state.board, pos);
   if (!cube) return state;
 
-  let s = state;
-  let nextPlayer: PlayerState = {
-    ...state.player,
-    hopping: false,
-    position: pos,
-    hopProgress: 0,
-    hopsRemaining: 0,
+  const { board, paintedNow, midNow } = applyColorRule(
+    state.board,
+    cube,
+    state.level.colorRule,
+  );
+
+  let s: GameState = {
+    ...state,
+    board,
+    player: {
+      ...state.player,
+      hopping: false,
+      position: pos,
+      hopProgress: 0,
+      hopsRemaining: 0,
+    },
   };
 
-  // 1. Color rule
-  const nextBoard = applyColorRule(state.board, cube, state.level.colorRule);
-  const landed = getCube(nextBoard, pos);
-  const paintedNow = landed ? landed.painted && !cube.painted : false;
   if (paintedNow) {
-    s = addScore(s, paintScore(s.combo));
-    s = bumpComboState(s);
-    s = addParticle(s, pos, "colorChange", "#30d5c8");
+    s = addScore(s, paintScore(Math.max(1, s.combo)));
+    s = { ...s, combo: s.combo + 1, comboTimer: 3 };
+    s = addParticle(s, pos, "colorChange", s.level.targetHex);
+  } else if (midNow) {
+    s = addScore(s, midPaintScore());
+    s = addParticle(s, pos, "paint", s.level.midHex);
   }
 
-  // 2. Special block
-  if (landed) {
-    switch (landed.special) {
-      case "ice":
-      case "booster":
-        nextPlayer = {
-          ...nextPlayer,
-          hopsRemaining: nextPlayer.hopsRemaining + 1,
-        };
-        break;
-      case "sticky":
-        nextPlayer = { ...nextPlayer, stuck: true, stuckTimer: STICK_TIME };
-        break;
-      case "teleporter": {
-        const dest = teleportDestination(nextBoard, pos);
-        nextPlayer = { ...nextPlayer, position: dest, hopTo: dest };
-        s = addParticle(s, dest, "colorChange", "#a05ce0");
-        break;
-      }
-      default:
-        break;
-    }
-  }
+  return resolveContact(s);
+}
 
-  s = { ...s, board: nextBoard, player: nextPlayer };
-
-  // 3. Power-up
-  const puIndex = s.powerUpItems.findIndex(
-    (pu) => keyOf(pu.position) === keyOf(pos),
-  );
-  if (puIndex >= 0) s = collectPowerUp(s, s.powerUpItems[puIndex]);
-
-  // 4. Gem
-  const gemIndex = s.gems.findIndex(
-    (g) => !g.collected && keyOf(g.position) === keyOf(pos),
-  );
-  if (gemIndex >= 0) s = collectGem(s, s.gems[gemIndex]);
-
-  // 5. Disc ride
-  const discIndex = s.discSpots.findIndex(
-    (d) => keyOf(d.position) === keyOf(pos),
-  );
-  if (discIndex >= 0 && s.discs > 0 && !s.player.ridingDisc) {
-    s = startRide(s, discIndex);
-  }
-
-  // 6. Enemy collision
-  s = checkCollision(s);
-
+function lureCoily(state: GameState, from: CubePositionLike): GameState {
+  const coily = state.enemies.find((e) => e.kind === "eggSnake" && e.hatched);
+  if (!coily) return clearHazards(state);
+  const close =
+    keyOf(coily.position) === keyOf(from) ||
+    keyOf(coily.hopTo) === keyOf(from) ||
+    Math.abs(coily.position.x - from.x) + Math.abs(coily.position.z - from.z) <=
+      2;
+  if (!close) return clearHazards(state);
+  let s = addScore(state, LURE_POINTS);
+  s = addParticle(s, from, "enemyLure", "#a05ce0");
+  s = {
+    ...s,
+    enemies: [lureEnemy(coily)],
+    message: "500 — snake dove!",
+    spawnTimer: SPAWN_GRACE,
+  };
   return s;
 }
 
-/** Finish a hop: land, then chain any extra hops (ice/booster). */
-function completeHop(state: GameState): GameState {
-  let s = applyLanding(state);
-  if (
-    s.player.hopsRemaining > 0 &&
-    !s.player.falling &&
-    !s.player.ridingDisc &&
-    !s.player.stuck &&
-    s.phase === "playing"
-  ) {
-    const dir = s.player.hopDirection;
-    if (!dir) return s;
-    const target = neighbor(s.board, s.player.position, dir);
-    if (target) {
-      s = {
-        ...s,
-        player: {
-          ...s.player,
-          hopping: true,
-          hopFrom: s.player.position,
-          hopTo: target,
-          hopProgress: 0,
-          hopsRemaining: s.player.hopsRemaining - 1,
-        },
-      };
-    } else {
-      s = startFall(s);
-    }
-  }
+function startRide(
+  state: GameState,
+  disc: DiscSpot,
+  direction: HopDirection,
+): GameState {
+  let s: GameState = {
+    ...state,
+    discSpots: state.discSpots.map((d) =>
+      d.id === disc.id ? { ...d, used: true, active: true } : d,
+    ),
+    discs: Math.max(0, state.discs - 1),
+    player: {
+      ...state.player,
+      ridingDisc: true,
+      rideTimer: RIDE_TIME,
+      rideFrom: null,
+      hopping: false,
+      hopDirection: direction,
+    },
+  };
+  s = lureCoily(s, state.player.position);
   return s;
 }
 
-/** Advance enemy movement, hatching, and effects. */
-function updateEnemies(state: GameState, deltaTime: number): GameState {
+function tickEnemies(state: GameState, deltaTime: number): GameState {
   let s = state;
-  let enemies = s.enemies.map((e) =>
-    e.frozenTimer > 0
-      ? { ...e, frozenTimer: Math.max(0, e.frozenTimer - deltaTime) }
-      : e,
-  );
-  enemies = enemies.map((e) => ({ ...e, moveTimer: e.moveTimer + deltaTime }));
-  const tick = ENEMY_TICK * (s.powerUps.slowEnemies ? 1.5 : 1);
+  const tick = state.level.enemyTick * DIFFICULTY_TICK[state.difficulty];
   let board = s.board;
-  let moved = false;
-  enemies = enemies.map((e) => {
-    if (e.frozenTimer > 0 || e.falling || e.moveTimer < tick) return e;
-    moved = true;
-    let next = stepEnemy(e, board, s.player);
-    if (next.kind === "eggSnake" && !next.hatched && next.hatchTimer <= 0) {
-      next = { ...next, hatched: true };
+  const next = s.enemies.flatMap((enemy) => {
+    if (enemy.falling) {
+      const fp = enemy.fallProgress + deltaTime * FALL_SPEED;
+      if (fp >= 1) return [];
+      return [{ ...enemy, fallProgress: fp }];
     }
-    board = applyEnemyEffect(next, board);
-    return { ...next, moveTimer: 0 };
+    if (enemy.frozenTimer > 0) {
+      return [
+        { ...enemy, frozenTimer: Math.max(0, enemy.frozenTimer - deltaTime) },
+      ];
+    }
+    if (enemy.hopping) {
+      const hp = enemy.hopProgress + deltaTime / ENEMY_HOP_TIME;
+      if (hp < 1) return [{ ...enemy, hopProgress: hp }];
+      const landed = landEnemy({ ...enemy, hopProgress: 1 }, board);
+      if (!landed) return [];
+      board = applyEnemyEffect(landed, board);
+      return [landed];
+    }
+    const wait = enemy.moveTimer + deltaTime;
+    if (wait < tick) return [{ ...enemy, moveTimer: wait }];
+    const choice = chooseEnemyHop(enemy, board, s.player);
+    if (!choice) return [];
+    return [beginEnemyHop(enemy, choice.to, choice.leaving)];
   });
-  s = { ...s, enemies, board };
-  if (moved) s = checkCollision(s);
-  return s;
+  s = { ...s, enemies: next, board };
+  return resolveContact(s);
 }
 
-/** Fade painted cubes back to washed under the timedDecay rule. */
-function decayBoard(board: Board, deltaTime: number): Board {
-  const cubes: Record<string, Cube> = { ...board.cubes };
-  let changed = false;
-  for (const k of Object.keys(cubes)) {
-    const c = cubes[k];
-    if (c.painted && c.decayTimer > 0) {
-      const dt = c.decayTimer - deltaTime;
-      if (dt <= 0) {
-        cubes[k] = { ...c, painted: false, color: "washed", decayTimer: 0 };
-        changed = true;
-      } else {
-        cubes[k] = { ...c, decayTimer: dt };
-      }
+function tickSpawns(state: GameState, deltaTime: number): GameState {
+  if (state.phase !== "playing") return state;
+  const every = state.level.spawnEvery * DIFFICULTY_SPAWN[state.difficulty];
+  const spawnTimer = state.spawnTimer + deltaTime;
+  if (spawnTimer < every) return { ...state, spawnTimer };
+  if (state.enemies.length >= state.level.maxEnemies) {
+    return { ...state, spawnTimer: every };
+  }
+
+  const roster = state.level.spawnRoster;
+  if (roster.length === 0) return { ...state, spawnTimer: 0 };
+
+  let index = state.spawnIndex;
+  let kind = roster[index % roster.length];
+  // Only one snake at a time.
+  if (kind === "eggSnake" && state.enemies.some((e) => e.kind === "eggSnake")) {
+    index += 1;
+    kind = roster[index % roster.length];
+    if (
+      kind === "eggSnake" &&
+      state.enemies.some((e) => e.kind === "eggSnake")
+    ) {
+      return { ...state, spawnTimer: 0, spawnIndex: index + 1 };
     }
   }
-  return changed ? { ...board, cubes } : board;
-}
 
-/** Cycle the color of multi special cubes over time. */
-function cycleMulti(board: Board, deltaTime: number): Board {
-  const cubes: Record<string, Cube> = { ...board.cubes };
-  let changed = false;
-  for (const k of Object.keys(cubes)) {
-    const c = cubes[k];
-    if (c.special === "multi") {
-      const next = c.cycleIndex + deltaTime / MULTI_CYCLE;
-      cubes[k] = {
-        ...c,
-        cycleIndex: next,
-        color: MULTI_COLORS[Math.floor(next) % MULTI_COLORS.length],
-      };
-      changed = true;
-    }
+  const spawned = spawnFromRoster(
+    kind,
+    state.board,
+    `e${state.levelNumber}-${index}-${Math.random().toString(36).slice(2, 6)}`,
+  );
+  if (!spawned) return { ...state, spawnTimer: 0, spawnIndex: index + 1 };
+  if (keyOf(spawned.position) === keyOf(state.player.position)) {
+    return { ...state, spawnTimer: every * 0.4, spawnIndex: index };
   }
-  return changed ? { ...board, cubes } : board;
+  return {
+    ...state,
+    enemies: [...state.enemies, spawned],
+    spawnTimer: 0,
+    spawnIndex: index + 1,
+  };
 }
 
-/**
- * Build a fresh level: board, player at the apex, and all spawns from the
- * level definition. Returns a partial state the store merges in.
- */
-export function startLevel(levelNumber: number): Partial<GameState> {
+export function startLevel(
+  levelNumber: number,
+  carry?: SessionCarry,
+): Partial<GameState> {
   const level = getLevel(levelNumber);
   let board = buildBoard(level);
-  if (level.colorRule === "twoHop") {
+  if (level.colorRule === "twoHop" || level.colorRule === "twoHopFlip") {
     const cubes: Record<string, Cube> = {};
     for (const k of Object.keys(board.cubes)) {
       cubes[k] = { ...board.cubes[k], paintProgress: 2 };
@@ -485,105 +516,130 @@ export function startLevel(levelNumber: number): Partial<GameState> {
     board = { ...board, cubes };
   }
   const apexPos = apex(board).position;
+  const lives = carry?.lives ?? level.lives;
   return {
     phase: "playing",
     level,
     levelNumber,
     board,
     player: emptyPlayer(apexPos),
-    enemies: cloneEnemies(level.enemies),
-    powerUpItems: level.powerUps.map((p) => ({ ...p })),
-    gems: level.gems.map((g) => ({ ...g })),
+    enemies: [],
+    powerUpItems: [],
+    gems: [],
     discSpots: level.discSpots.map((d) => ({ ...d })),
     particles: [],
     effectTimers: emptyEffectTimers(),
     shake: 0,
-    message: null,
-    lives: level.lives,
-    discs: level.discs,
+    message: level.name,
+    lives,
+    discs: level.discSpots.length,
     targetColor: level.targetColor,
     combo: 0,
     comboTimer: 0,
     powerUps: emptyActivePowerUps(),
+    spawnTimer: SPAWN_GRACE,
+    spawnIndex: 0,
+    extraLifeAwarded: carry?.extraLifeAwarded ?? false,
   };
 }
 
-/** Initiate a diagonal hop in the given direction. */
+/** Initiate a diagonal hop, ride a disc, or fall off the pyramid. */
 export function hop(state: GameState, direction: HopDirection): GameState {
   if (state.phase !== "playing") return state;
   const p = state.player;
-  if (p.hopping || p.falling || p.ridingDisc || p.stuck) return state;
+  if (p.hopping || p.falling || p.ridingDisc || p.stuck || p.stunned) {
+    return state;
+  }
 
   const target = neighbor(state.board, p.position, direction);
-  if (!target) return startFall(state);
+  if (target) {
+    return {
+      ...state,
+      player: {
+        ...p,
+        hopping: true,
+        hopDirection: direction,
+        hopFrom: p.position,
+        hopTo: target,
+        hopProgress: 0,
+        hopsRemaining: 0,
+      },
+    };
+  }
 
-  return {
-    ...state,
-    player: {
-      ...p,
-      hopping: true,
-      hopDirection: direction,
-      hopFrom: p.position,
-      hopTo: target,
-      hopProgress: 0,
-      hopsRemaining: 1,
-    },
-  };
+  const disc = findDisc(state.discSpots, p.position, direction);
+  if (disc) return startRide(state, disc, direction);
+
+  return startFall(state, direction);
 }
 
-/** Advance the game by a frame of `deltaTime` seconds. */
 export function update(state: GameState, deltaTime: number): GameState {
   if (state.phase !== "playing") return state;
   let s = state;
 
-  // Hop animation
+  if (s.player.swearTimer > 0) {
+    s = {
+      ...s,
+      player: {
+        ...s.player,
+        swearTimer: Math.max(0, s.player.swearTimer - deltaTime),
+      },
+    };
+  }
+
+  if (s.player.stunned && !s.player.falling) {
+    const st = s.player.stunTimer - deltaTime;
+    s = {
+      ...s,
+      player: { ...s.player, stunned: st > 0, stunTimer: Math.max(0, st) },
+    };
+  }
+
   if (s.player.hopping) {
     const hp = s.player.hopProgress + deltaTime * HOP_SPEED;
     if (hp >= 1) {
-      s = completeHop(s);
+      s = applyLanding(s);
     } else {
       s = { ...s, player: { ...s.player, hopProgress: hp } };
     }
   }
 
-  // Fall animation
   if (s.player.falling) {
     const fp = s.player.fallProgress + deltaTime * FALL_SPEED;
     if (fp >= 1) {
-      s = {
-        ...s,
-        player: {
-          ...s.player,
-          falling: false,
-          fallProgress: 0,
-          position: apex(s.board).position,
-        },
-      };
+      if (s.phase === "gameover") {
+        s = { ...s, player: { ...s.player, fallProgress: 1 } };
+      } else {
+        const top = apex(s.board).position;
+        s = clearHazards(s);
+        s = {
+          ...s,
+          player: {
+            ...emptyPlayer(top),
+            stunned: true,
+            stunTimer: FALL_STUN,
+          },
+        };
+      }
     } else {
       s = { ...s, player: { ...s.player, fallProgress: fp } };
     }
   }
 
-  // Stuck
-  if (s.player.stuck) {
-    const st = s.player.stuckTimer - deltaTime;
-    s = {
-      ...s,
-      player: { ...s.player, stuck: st > 0, stuckTimer: Math.max(0, st) },
-    };
-  }
-
-  // Disc ride
   if (s.player.ridingDisc) {
     const rt = s.player.rideTimer - deltaTime;
     if (rt <= 0) {
+      const top = apex(s.board).position;
       s = {
         ...s,
         player: {
           ...s.player,
           ridingDisc: false,
           rideTimer: 0,
-          position: apex(s.board).position,
+          rideFrom: null,
+          position: top,
+          hopTo: top,
+          hopFrom: top,
         },
         discSpots: s.discSpots.map((d) => ({ ...d, active: false })),
       };
@@ -592,32 +648,18 @@ export function update(state: GameState, deltaTime: number): GameState {
     }
   }
 
-  // Enemies
-  s = updateEnemies(s, deltaTime);
+  s = tickEnemies(s, deltaTime);
+  s = tickSpawns(s, deltaTime);
 
-  // Effect timers
   const { active, timers } = tickEffects(s.powerUps, s.effectTimers, deltaTime);
   s = { ...s, powerUps: active, effectTimers: timers };
 
-  // Color decay
-  if (s.level.colorRule === "timedDecay") {
-    s = { ...s, board: decayBoard(s.board, deltaTime) };
-  }
-
-  // Multi cycling
-  s = { ...s, board: cycleMulti(s.board, deltaTime) };
-
-  // Combo decay
   if (s.combo > 0) {
     const ct = s.comboTimer - deltaTime;
-    if (ct <= 0) {
-      s = { ...s, combo: 0, comboTimer: 0 };
-    } else {
-      s = { ...s, comboTimer: ct };
-    }
+    if (ct <= 0) s = { ...s, combo: 0, comboTimer: 0 };
+    else s = { ...s, comboTimer: ct };
   }
 
-  // Particles
   s = {
     ...s,
     particles: s.particles
@@ -625,20 +667,29 @@ export function update(state: GameState, deltaTime: number): GameState {
       .filter((p) => p.life > 0),
   };
 
-  // Shake decay
-  if (s.shake > 0) {
-    s = { ...s, shake: Math.max(0, s.shake - deltaTime) };
-  }
+  if (s.shake > 0) s = { ...s, shake: Math.max(0, s.shake - deltaTime) };
 
-  // Level clear
   if (s.phase === "playing" && isBoardPainted(s.board)) {
-    s = {
-      ...s,
-      phase: "levelclear",
-      score: s.score + LEVEL_CLEAR_POINTS,
-      message: "Level Clear!",
-    };
+    const unused = s.discSpots.filter((d) => !d.used).length;
+    const bonus =
+      levelClearBonus(s.levelNumber) + unusedDiscBonus(unused, s.levelNumber);
+    s = addScore(
+      {
+        ...s,
+        phase: "levelclear",
+        message: "Level Clear!",
+      },
+      bonus,
+    );
   }
 
   return s;
+}
+
+/** Advance to the next stage, keeping lives and extra-life state. */
+export function advanceLevel(state: GameState): Partial<GameState> {
+  return startLevel(state.levelNumber + 1, {
+    lives: state.lives,
+    extraLifeAwarded: state.extraLifeAwarded,
+  });
 }

@@ -1,5 +1,6 @@
 import { useGameStore } from "@/game/store";
 import { GameScreen } from "@/pages/GameScreen";
+import { HowToPlay } from "@/pages/HowToPlay";
 import { MainMenu } from "@/pages/MainMenu";
 import { SettingsScreen } from "@/pages/SettingsScreen";
 
@@ -12,6 +13,7 @@ export default function App() {
       {screen === "menu" && <MainMenu />}
       {screen === "game" && <GameScreen />}
       {screen === "settings" && <SettingsScreen />}
+      {screen === "howto" && <HowToPlay />}
     </div>
   );
 }

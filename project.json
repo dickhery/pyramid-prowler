@@ -1,11 +1,11 @@
 {
-  "overview": "A polished pseudo-3D isometric action-puzzle game where a cute big-nosed creature hops diagonally across a pyramid of cubes, turning every top face to the target color while dodging enemies and grabbing power-ups.",
+  "overview": "A polished pseudo-3D isometric action-puzzle game where a cute big-nosed creature hops diagonally across a pyramid of cubes, turning every top face to the target color while dodging enemies and riding escape discs.",
   "features": [
     "Hop diagonally across a 3D pyramid of cubes to change their color",
-    "Escalating color rules and special blocks (ice, sticky, teleporter, booster)",
+    "Classic color rules: one hop, two hops, and flip-back stages",
     "Roster of enemies including egg-hatching snakes, side-crawlers, and falling balls",
-    "Power-ups like invincibility, speed boost, and freeze ray",
-    "Gems, combo scoring, and escalating arcade levels",
+    "Floating discs that ride you back to the apex and can lure the snake off",
+    "Arcade scoring, extra lives, and escalating stages",
     "Pseudo-3D isometric view with a free-orbit camera option"
   ],
   "category": "game",
