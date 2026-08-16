@@ -158,11 +158,11 @@ export function HowToPlay() {
 
           <Section title="Sound">
             <p>
-              While you hop, a looping stage bed plays in the browser — bright
-              and fast on early rounds, spookier once flip-back and finale
-              stages begin. Mute music or effects separately in Settings, or tap
-              Sound on the HUD. 8-bit cues mark hops, paints, extra lives, and
-              close calls.
+              While you hop, a quieter looping bed plays in the browser. Each
+              round rotates to the other track in that mood — bright and fast
+              early, spookier on flip-back and finale stages. Mute music or
+              effects separately in Settings, or tap Sound on the HUD. 8-bit
+              cues mark hops, paints, extra lives, and close calls.
             </p>
           </Section>
 

@@ -102,7 +102,7 @@ export function SettingsScreen() {
           />
           <ToggleRow
             label="Mute music"
-            hint="Stage beds play only while you hop — fast early, spooky later"
+            hint="A quieter bed rotates each round — fast early, spooky later"
             checked={musicOff}
             onChange={setMusicOff}
             dataOcid="settings.music_toggle"

@@ -133,6 +133,14 @@ export function Character() {
   useFrame((state) => {
     const g = bounceRef.current;
     if (!g) return;
+    const parent = g.parent;
+    if (parent) {
+      const dx = state.camera.position.x - parent.position.x;
+      const dz = state.camera.position.z - parent.position.z;
+      if (dx * dx + dz * dz > 0.0001) {
+        g.rotation.y = Math.atan2(dx, dz);
+      }
+    }
     if (!player.hopping && !player.falling && !player.ridingDisc) {
       g.position.y = Math.abs(Math.sin(state.clock.elapsedTime * 4)) * 0.04;
     } else {
@@ -156,7 +164,7 @@ export function Character() {
     <group>
       <Trail player={player} board={board} />
       <group position={pos}>
-        <group ref={bounceRef} rotation={[0, -Math.PI / 4, 0]}>
+        <group ref={bounceRef}>
           <CharacterBody scale={scale} />
           {showSwear && (
             <Html position={[0.15, 0.72, 0.2]} center distanceFactor={8}>

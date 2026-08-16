@@ -41,8 +41,8 @@ const TRACKS: Record<MusicId, string> = {
   spooky2: "/assets/audio/Pyramid_Prowler_spooky_2.mp3",
 };
 
-const MUSIC_VOLUME = 0.36;
-const MUSIC_PAUSED_VOLUME = 0.1;
+const MUSIC_VOLUME = 0.16;
+const MUSIC_PAUSED_VOLUME = 0.05;
 const SFX_MASTER = 0.22;
 
 function loadFlag(key: string): boolean {
@@ -61,11 +61,14 @@ function saveFlag(key: string, value: boolean): void {
   }
 }
 
+const EARLY_BEDS: MusicId[] = ["fast1", "fast2"];
+const LATE_BEDS: MusicId[] = ["spooky1", "spooky2"];
+
 /**
  * Pick a bed for the current stage.
- * Tracks stay put for a three-round block so a bed is not swapped on
- * every clear. Early blocks are the fast cues; flip-back, two-hop-flip,
- * and late rounds use the spooky cues.
+ * Consecutive rounds always swap files. Early one-hop / two-hop
+ * stages rotate the two fast beds; flip-back, two-hop-flip, and
+ * late stages rotate the two spooky beds.
  */
 export function musicForStage(
   levelNumber: number,
@@ -74,9 +77,8 @@ export function musicForStage(
   const round = ((Math.max(1, levelNumber) - 1) % 12) + 1;
   const tense =
     colorRule === "flipBack" || colorRule === "twoHopFlip" || round >= 7;
-  const block = Math.floor((round - 1) / 3);
-  if (tense) return block >= 3 ? "spooky2" : "spooky1";
-  return block >= 1 ? "fast2" : "fast1";
+  const beds = tense ? LATE_BEDS : EARLY_BEDS;
+  return beds[(Math.max(1, levelNumber) - 1) % beds.length];
 }
 
 class ArcadeAudio {
