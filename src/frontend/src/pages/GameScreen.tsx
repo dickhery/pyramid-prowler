@@ -4,7 +4,16 @@ import { Scene } from "@/components/three/Scene";
 import { useGameStore } from "@/game/store";
 import type { HopDirection } from "@/game/types";
 import { useGameAudio } from "@/game/useGameAudio";
-import { ArrowLeft, Camera, Pause, Play, RotateCcw } from "lucide-react";
+import { useSwipeHop } from "@/game/useSwipeHop";
+import {
+  ArrowLeft,
+  Camera,
+  Pause,
+  Play,
+  RotateCcw,
+  Volume2,
+  VolumeX,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { PillButton } from "./MainMenu";
 
@@ -42,7 +51,7 @@ function HopPad() {
         event.preventDefault();
         hop(dir);
       }}
-      className={`flex size-14 items-center justify-center rounded-2xl bg-card/85 font-mono text-[10px] font-bold uppercase tracking-wide text-foreground shadow-plastic-sm backdrop-blur transition-transform hover:brightness-110 active:translate-y-0.5 disabled:opacity-40 ${extra}`}
+      className={`flex size-16 items-center justify-center rounded-2xl bg-card/90 font-mono text-[10px] font-bold uppercase tracking-wide text-foreground shadow-plastic-sm backdrop-blur transition-transform hover:brightness-110 active:translate-y-0.5 disabled:opacity-40 sm:size-14 ${extra}`}
     >
       {label}
     </button>
@@ -50,7 +59,7 @@ function HopPad() {
 
   return (
     <div
-      className="pointer-events-auto absolute bottom-6 left-4 z-20 grid grid-cols-3 grid-rows-3 gap-2 sm:bottom-8"
+      className="pointer-events-auto absolute bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-1/2 z-20 grid -translate-x-1/2 grid-cols-3 grid-rows-3 gap-1.5 sm:bottom-8 sm:left-4 sm:translate-x-0 sm:gap-2"
       data-ocid="game.hop_pad"
     >
       <div />
@@ -71,6 +80,7 @@ function HopPad() {
 export function GameScreen() {
   useGameAudio();
   const phase = useGameStore((s) => s.phase);
+  useSwipeHop(phase === "playing");
   const cameraMode = useGameStore((s) => s.cameraMode);
   const setCameraMode = useGameStore((s) => s.setCameraMode);
   const pauseGame = useGameStore((s) => s.pauseGame);
@@ -82,6 +92,8 @@ export function GameScreen() {
   const score = useGameStore((s) => s.score);
   const levelNumber = useGameStore((s) => s.levelNumber);
   const levelName = useGameStore((s) => s.level.name);
+  const soundMuted = useGameStore((s) => s.soundMuted);
+  const setSoundMuted = useGameStore((s) => s.setSoundMuted);
   const [showIntro, setShowIntro] = useState(true);
 
   useEffect(() => {
@@ -92,6 +104,15 @@ export function GameScreen() {
 
   const toggleCamera = () =>
     setCameraMode(cameraMode === "isometric" ? "orbit" : "isometric");
+
+  useEffect(() => {
+    if (phase !== "playing") return;
+    const preventScroll = (event: TouchEvent) => {
+      event.preventDefault();
+    };
+    document.addEventListener("touchmove", preventScroll, { passive: false });
+    return () => document.removeEventListener("touchmove", preventScroll);
+  }, [phase]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -111,17 +132,17 @@ export function GameScreen() {
   }, [hop, phase, pauseGame, resumeGame]);
 
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-background">
+    <div className="relative h-dvh w-screen overflow-hidden bg-background touch-none">
       <Scene />
       <HUD />
 
-      <div className="absolute bottom-6 right-4 z-20 flex flex-col items-end gap-2">
+      <div className="absolute bottom-[max(0.75rem,env(safe-area-inset-bottom))] right-[max(0.5rem,env(safe-area-inset-right))] z-20 flex flex-col items-end gap-2 sm:bottom-6 sm:right-4">
         <button
           type="button"
           data-ocid="game.camera_toggle"
           aria-label={`Switch to ${cameraMode === "isometric" ? "orbit" : "isometric"} camera`}
           onClick={toggleCamera}
-          className="flex items-center gap-2 rounded-full bg-card/80 px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider text-foreground shadow-plastic-sm backdrop-blur transition-colors hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="hidden items-center gap-2 rounded-full bg-card/80 px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider text-foreground shadow-plastic-sm backdrop-blur transition-colors hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:flex"
         >
           <Camera className="size-4" />
           {cameraMode}
@@ -131,24 +152,26 @@ export function GameScreen() {
           data-ocid="game.pause_button"
           aria-label={phase === "paused" ? "Resume game" : "Pause game"}
           onClick={phase === "paused" ? resumeGame : pauseGame}
-          className="flex items-center gap-2 rounded-full bg-card/80 px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider text-foreground shadow-plastic-sm backdrop-blur transition-colors hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="flex size-11 items-center justify-center rounded-full bg-card/85 text-foreground shadow-plastic-sm backdrop-blur sm:h-auto sm:w-auto sm:gap-2 sm:px-4 sm:py-2 sm:font-mono sm:text-xs sm:font-bold sm:uppercase sm:tracking-wider"
         >
           {phase === "paused" ? (
-            <Play className="size-4 fill-current" />
+            <Play className="size-5 fill-current sm:size-4" />
           ) : (
-            <Pause className="size-4" />
+            <Pause className="size-5 sm:size-4" />
           )}
-          {phase === "paused" ? "Resume" : "Pause"}
+          <span className="hidden sm:inline">
+            {phase === "paused" ? "Resume" : "Pause"}
+          </span>
         </button>
         <button
           type="button"
           data-ocid="game.back_button"
           aria-label="Back to menu"
           onClick={backToMenu}
-          className="flex items-center gap-2 rounded-full bg-card/80 px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider text-foreground shadow-plastic-sm backdrop-blur transition-colors hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="flex size-11 items-center justify-center rounded-full bg-card/85 text-foreground shadow-plastic-sm backdrop-blur sm:h-auto sm:w-auto sm:gap-2 sm:px-4 sm:py-2 sm:font-mono sm:text-xs sm:font-bold sm:uppercase sm:tracking-wider"
         >
-          <ArrowLeft className="size-4" />
-          Menu
+          <ArrowLeft className="size-5 sm:size-4" />
+          <span className="hidden sm:inline">Menu</span>
         </button>
       </div>
 
@@ -173,19 +196,31 @@ export function GameScreen() {
           data-ocid="game.pause_overlay"
           className="absolute inset-0 z-30 flex items-center justify-center bg-background/70 backdrop-blur-sm"
         >
-          <div className="flex max-w-md flex-col items-center gap-6 rounded-3xl bg-card/90 p-10 shadow-plastic">
-            <h2 className="font-display text-4xl font-black text-foreground">
+          <div className="mx-4 flex max-h-[90dvh] w-full max-w-md flex-col items-center gap-5 overflow-y-auto rounded-3xl bg-card/90 p-6 shadow-plastic sm:gap-6 sm:p-10">
+            <h2 className="font-display text-3xl font-black text-foreground sm:text-4xl">
               Paused
             </h2>
             <p className="text-center text-sm text-muted-foreground">
-              Q / ← up-left · W / ↑ up-right · A / ↓ down-left · S / →
-              down-right. Hop off a pink disc to ride home. Do not hop off the
-              pyramid.
+              Swipe diagonally or use the hop pad. On a keyboard: Q / ← up-left
+              · W / ↑ up-right · A / ↓ down-left · S / → down-right. Hop onto a
+              pink disc to ride home. Do not hop off the pyramid.
             </p>
             <div className="flex flex-col items-center gap-3">
               <PillButton dataOcid="game.resume_button" onClick={resumeGame}>
                 <Play className="size-5 fill-current" />
                 Resume
+              </PillButton>
+              <PillButton
+                dataOcid="game.pause_mute_button"
+                onClick={() => setSoundMuted(!soundMuted)}
+                variant="secondary"
+              >
+                {soundMuted ? (
+                  <VolumeX className="size-5" />
+                ) : (
+                  <Volume2 className="size-5" />
+                )}
+                {soundMuted ? "Unmute" : "Mute"}
               </PillButton>
               <PillButton
                 dataOcid="game.pause_menu_button"
@@ -205,11 +240,11 @@ export function GameScreen() {
           data-ocid="game.levelclear_overlay"
           className="absolute inset-0 z-30 flex items-center justify-center bg-background/70 backdrop-blur-sm"
         >
-          <div className="flex flex-col items-center gap-6 rounded-3xl bg-card/90 p-10 text-center shadow-plastic">
+          <div className="mx-4 flex max-h-[90dvh] w-full max-w-lg flex-col items-center gap-5 overflow-y-auto rounded-3xl bg-card/90 p-6 text-center shadow-plastic sm:gap-6 sm:p-10">
             <span className="font-mono text-xs uppercase tracking-widest text-primary">
               {levelName} complete
             </span>
-            <h2 className="font-display text-5xl font-black text-foreground text-shadow-pop">
+            <h2 className="font-display text-4xl font-black text-foreground text-shadow-pop sm:text-5xl">
               Level Clear!
             </h2>
             <p className="max-w-sm text-muted-foreground">
@@ -229,11 +264,11 @@ export function GameScreen() {
           data-ocid="game.gameover_overlay"
           className="absolute inset-0 z-30 flex items-center justify-center bg-background/70 backdrop-blur-sm"
         >
-          <div className="flex flex-col items-center gap-6 rounded-3xl bg-card/90 p-10 text-center shadow-plastic">
+          <div className="mx-4 flex max-h-[90dvh] w-full max-w-lg flex-col items-center gap-4 overflow-y-auto rounded-3xl bg-card/90 p-5 text-center shadow-plastic sm:gap-6 sm:p-10">
             <span className="font-mono text-xs uppercase tracking-widest text-destructive">
               Out of lives
             </span>
-            <h2 className="font-display text-5xl font-black text-destructive text-shadow-pop">
+            <h2 className="font-display text-4xl font-black text-destructive text-shadow-pop sm:text-5xl">
               Game Over
             </h2>
             <p className="max-w-sm text-muted-foreground">

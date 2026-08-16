@@ -25,10 +25,10 @@ export function HowToPlay() {
   const startGame = useGameStore((s) => s.startGame);
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-pop px-6 py-10">
-      <div className="w-full max-w-2xl rounded-3xl bg-card/85 p-8 shadow-plastic backdrop-blur">
+    <div className="flex min-h-dvh flex-col items-center justify-center overflow-y-auto bg-gradient-pop px-4 py-[max(1rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-10">
+      <div className="w-full max-w-2xl rounded-3xl bg-card/85 p-5 shadow-plastic backdrop-blur sm:p-8">
         <div className="mb-6 flex items-center justify-between gap-4">
-          <h2 className="font-display text-3xl font-black text-foreground">
+          <h2 className="font-display text-2xl font-black text-foreground sm:text-3xl">
             How to Play
           </h2>
           <PillButton
@@ -42,7 +42,7 @@ export function HowToPlay() {
           </PillButton>
         </div>
 
-        <div className="flex max-h-[70vh] flex-col gap-6 overflow-y-auto pr-1">
+        <div className="flex max-h-[min(70vh,calc(100dvh-11rem))] flex-col gap-6 overflow-y-auto pr-1">
           <Section title="Goal">
             <p>
               You are Prowler, the orange hopper. Start at the top of the
@@ -78,7 +78,11 @@ export function HowToPlay() {
                 <span className="font-mono text-foreground">D</span> — hop
                 down-right
               </li>
-              <li>On-screen diamond buttons or tap a neighboring cube</li>
+              <li>
+                On a phone: swipe diagonally across the board, or use the hop
+                pad
+              </li>
+              <li>On desktop: tap a neighboring cube or use the hop pad</li>
               <li>
                 <span className="font-mono text-foreground">Esc</span> — pause
               </li>

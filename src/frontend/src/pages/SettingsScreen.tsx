@@ -59,8 +59,8 @@ export function SettingsScreen() {
   const setSoundMuted = useGameStore((s) => s.setSoundMuted);
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-pop px-6">
-      <div className="w-full max-w-md rounded-3xl bg-card/80 p-8 shadow-plastic backdrop-blur">
+    <div className="flex min-h-dvh flex-col items-center justify-center overflow-y-auto bg-gradient-pop px-4 py-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-6">
+      <div className="w-full max-w-md rounded-3xl bg-card/80 p-5 shadow-plastic backdrop-blur sm:p-8">
         <div className="mb-6 flex items-center justify-between">
           <h2 className="font-display text-3xl font-black text-foreground">
             Settings

@@ -164,7 +164,8 @@ export function fitDistance(
   const half = Math.tan(fov / 2);
   const distV = height / 2 / half;
   const distH = width / 2 / half / Math.max(aspect, 0.5);
-  return Math.max(distV, distH, 8) * padding;
+  const portrait = aspect < 0.85 ? 1.22 : 1;
+  return Math.max(distV, distH, 8) * padding * portrait;
 }
 
 /**

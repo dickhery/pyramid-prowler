@@ -10,7 +10,7 @@ export default function App() {
   const screen = useGameStore((s) => s.screen);
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-dvh bg-background text-foreground">
       {screen === "menu" && <MainMenu />}
       {screen === "game" && <GameScreen />}
       {screen === "settings" && <SettingsScreen />}

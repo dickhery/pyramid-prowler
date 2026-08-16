@@ -50,8 +50,8 @@ export function LeaderboardScreen() {
   const myText = identity?.getPrincipal().toText() ?? "";
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-pop px-6 py-10">
-      <div className="w-full max-w-xl rounded-3xl bg-card/85 p-8 shadow-plastic backdrop-blur">
+    <div className="flex min-h-dvh flex-col items-center justify-center overflow-y-auto bg-gradient-pop px-4 py-[max(1rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-10">
+      <div className="w-full max-w-xl rounded-3xl bg-card/85 p-5 shadow-plastic backdrop-blur sm:p-8">
         <div className="mb-6 flex items-center justify-between gap-4">
           <h2 className="flex items-center gap-2 font-display text-3xl font-black text-foreground">
             <Trophy className="size-7 text-accent" />

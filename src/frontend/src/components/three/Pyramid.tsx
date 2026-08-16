@@ -54,6 +54,7 @@ function CubeMesh({
         material={materials}
         onPointerDown={(event) => {
           if (!clickable) return;
+          if (event.pointerType === "touch") return;
           event.stopPropagation();
           onHop();
         }}

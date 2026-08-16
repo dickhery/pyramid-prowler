@@ -20,7 +20,7 @@ export function PillButton({
   className?: string;
 }) {
   const base =
-    "inline-flex items-center justify-center gap-2 rounded-full px-8 py-3 font-display text-lg font-extrabold transition-transform duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:translate-y-0.5";
+    "inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-8 py-3 font-display text-lg font-extrabold transition-transform duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:translate-y-0.5";
   const styles =
     variant === "primary"
       ? "bg-primary text-primary-foreground shadow-plastic hover:-translate-y-0.5 hover:brightness-110"
@@ -45,7 +45,7 @@ export function MainMenu() {
   const goToLeaderboard = useGameStore((s) => s.goToLeaderboard);
 
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-gradient-pop px-6">
+    <div className="relative flex min-h-dvh flex-col items-center justify-center overflow-y-auto overflow-x-hidden bg-gradient-pop px-4 py-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-6">
       <div className="absolute inset-0 flex items-center justify-center opacity-20">
         <div className="grid grid-cols-5 gap-2">
           {DECO_KEYS.map((k) => (
@@ -65,7 +65,7 @@ export function MainMenu() {
 
         <h1
           data-ocid="menu.title"
-          className="font-display text-6xl font-black leading-none text-foreground text-shadow-pop sm:text-7xl"
+          className="font-display text-5xl font-black leading-none text-foreground text-shadow-pop sm:text-7xl"
         >
           Pyramid
           <span className="block text-primary">Prowler</span>
@@ -75,7 +75,7 @@ export function MainMenu() {
           Hop the pyramid. Paint the world back to life.
         </p>
 
-        <p className="mt-6 max-w-md text-base leading-relaxed text-muted-foreground">
+        <p className="mt-4 hidden max-w-md text-base leading-relaxed text-muted-foreground sm:mt-6 sm:block">
           A mischievous color thief drained every cube of its hue. You are
           Prowler — hop diagonally across the pyramid, change every top face to
           the target color, and dodge bouncing balls, a hatching snake, and
@@ -83,7 +83,7 @@ export function MainMenu() {
           in.
         </p>
 
-        <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:flex-wrap sm:justify-center">
+        <div className="mt-8 flex w-full max-w-sm flex-col items-stretch gap-3 sm:mt-10 sm:max-w-none sm:flex-row sm:flex-wrap sm:items-center sm:justify-center sm:gap-4">
           <PillButton
             dataOcid="menu.start_button"
             onClick={() => {
@@ -91,7 +91,7 @@ export function MainMenu() {
               arcadeAudio.play("ui");
               startGame();
             }}
-            className="text-xl"
+            className="w-full text-xl sm:w-auto"
           >
             <Play className="size-5 fill-current" />
             Start Hopping!
@@ -100,6 +100,7 @@ export function MainMenu() {
             dataOcid="menu.howto_button"
             onClick={goToHowTo}
             variant="secondary"
+            className="w-full sm:w-auto"
           >
             <BookOpen className="size-5" />
             How to Play
@@ -108,6 +109,7 @@ export function MainMenu() {
             dataOcid="menu.leaderboard_button"
             onClick={goToLeaderboard}
             variant="secondary"
+            className="w-full sm:w-auto"
           >
             <Trophy className="size-5" />
             Leaderboard
@@ -116,6 +118,7 @@ export function MainMenu() {
             dataOcid="menu.settings_button"
             onClick={goToSettings}
             variant="secondary"
+            className="w-full sm:w-auto"
           >
             <Settings className="size-5" />
             Settings
@@ -123,7 +126,7 @@ export function MainMenu() {
         </div>
 
         <p className="mt-8 font-mono text-xs uppercase tracking-widest text-muted-foreground">
-          Q / W / A / S or arrows — hop the four diagonals
+          Swipe or hop pad on phones · QWAS / arrows on desktop
         </p>
       </div>
     </div>

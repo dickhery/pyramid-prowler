@@ -116,7 +116,7 @@ function Status() {
   const phase = useGameStore((s) => s.phase);
   if (!message || phase !== "playing") return null;
   return (
-    <div className="pointer-events-none absolute left-1/2 top-20 -translate-x-1/2">
+    <div className="pointer-events-none absolute left-1/2 top-16 -translate-x-1/2 sm:top-20">
       <span className="rounded-full bg-card/80 px-4 py-1 font-display text-sm font-bold text-foreground shadow-plastic-sm backdrop-blur">
         {message}
       </span>
@@ -145,37 +145,39 @@ export function HUD() {
   const score = useGameStore((s) => s.score);
 
   return (
-    <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-4 p-4">
-      <div className="flex flex-col gap-2">
+    <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-2 p-2 pt-[max(0.5rem,env(safe-area-inset-top))] sm:gap-4 sm:p-4">
+      <div className="flex flex-col gap-1.5 sm:gap-2">
         <div
-          className="rounded-2xl bg-card/80 px-4 py-2 shadow-plastic-sm backdrop-blur"
+          className="rounded-xl bg-card/80 px-2.5 py-1 shadow-plastic-sm backdrop-blur sm:rounded-2xl sm:px-4 sm:py-2"
           data-ocid="hud.score"
         >
-          <span className="font-mono text-2xl font-bold tracking-wider text-foreground">
+          <span className="font-mono text-lg font-bold tracking-wider text-foreground sm:text-2xl">
             {pad(score)}
           </span>
         </div>
-        <div className="rounded-2xl bg-card/80 px-4 py-2 shadow-plastic-sm backdrop-blur">
+        <div className="rounded-xl bg-card/80 px-2.5 py-1 shadow-plastic-sm backdrop-blur sm:rounded-2xl sm:px-4 sm:py-2">
           <Lives />
         </div>
       </div>
 
-      <div className="flex flex-col items-end gap-2">
-        <div className="rounded-2xl bg-card/80 px-4 py-2 shadow-plastic-sm backdrop-blur">
+      <div className="flex max-w-[55%] flex-wrap items-end justify-end gap-1.5 sm:max-w-none sm:flex-col sm:gap-2">
+        <div className="rounded-xl bg-card/80 px-2.5 py-1 shadow-plastic-sm backdrop-blur sm:rounded-2xl sm:px-4 sm:py-2">
           <Level />
         </div>
-        <div className="rounded-2xl bg-card/80 px-4 py-2 shadow-plastic-sm backdrop-blur">
+        <div className="hidden rounded-2xl bg-card/80 px-4 py-2 shadow-plastic-sm backdrop-blur sm:block">
           <TargetSwatch />
         </div>
-        <div className="flex gap-2">
-          <div className="rounded-2xl bg-card/80 px-3 py-2 shadow-plastic-sm backdrop-blur">
+        <div className="flex gap-1.5 sm:gap-2">
+          <div className="rounded-xl bg-card/80 px-2 py-1 shadow-plastic-sm backdrop-blur sm:rounded-2xl sm:px-3 sm:py-2">
             <Discs />
           </div>
-          <div className="rounded-2xl bg-card/80 px-3 py-2 shadow-plastic-sm backdrop-blur">
+          <div className="rounded-xl bg-card/80 px-2 py-1 shadow-plastic-sm backdrop-blur sm:rounded-2xl sm:px-3 sm:py-2">
             <Remaining />
           </div>
         </div>
-        <MuteToggle />
+        <div className="hidden sm:block">
+          <MuteToggle />
+        </div>
       </div>
 
       <Status />
