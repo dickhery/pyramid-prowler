@@ -10,8 +10,11 @@ import type {
 /** Edge length of a single cube in world units. */
 export const CUBE_SIZE = 1;
 
-/** Forward step per pyramid row — close to a full cube so tops stay readable. */
-export const ROW_DEPTH = 0.86;
+/**
+ * Step along each isometric axis. Kept equal to `CUBE_SIZE` so cubes
+ * share faces instead of forming a flat, front-facing wall of boxes.
+ */
+export const ROW_DEPTH = CUBE_SIZE;
 
 /** Distance from a cube's top face to the character origin (body center). */
 export const FOOT_OFFSET = 0.56;
@@ -19,18 +22,19 @@ export const FOOT_OFFSET = 0.56;
 /**
  * Convert a grid cube into world-space [x, y, z].
  *
- * Cubes form a triangular staircase (classic isometric pyramid):
- * each down-left / down-right hop offsets by half a cube sideways,
- * a full cube down, and half a cube toward the camera. The character
- * must use `standOnTop` — this returns the cube *centre*, which sits
- * inside the block.
+ * Logical cells stay `0 <= x <= z < height`. World space uses axial
+ * isometric axes so a down-left hop is +Z and a down-right hop is +X.
+ * A camera in the +X+Y+Z octant then sees each cube as a hexagon
+ * (top + two sides) — the original Q*bert staircase, not a straight
+ * row of front-facing boxes. The character must use `standOnTop`;
+ * this returns the cube centre, which sits inside the block.
  */
 export function cubeCenter(
   _board: Board,
   pos: CubePosition,
 ): [number, number, number] {
   const s = CUBE_SIZE;
-  return [(pos.x - pos.z / 2) * s, pos.y * s + s / 2, pos.z * ROW_DEPTH];
+  return [pos.x * s, pos.y * s + s / 2, (pos.z - pos.x) * s];
 }
 
 /** World position of the top centre of a cube. */
@@ -60,16 +64,15 @@ export function hopWorldDelta(
   direction: HopDirection,
 ): [number, number, number] {
   const s = CUBE_SIZE;
-  const d = ROW_DEPTH;
   switch (direction) {
     case "north":
-      return [-s / 2, s, -d];
+      return [-s, s, 0];
     case "south":
-      return [s / 2, -s, d];
+      return [s, -s, 0];
     case "east":
-      return [-s / 2, -s, d];
+      return [0, -s, s];
     case "west":
-      return [s / 2, s, -d];
+      return [0, s, -s];
   }
 }
 
@@ -131,8 +134,8 @@ export function boardBounds(board: Board): {
   minX -= CUBE_SIZE;
   maxX += CUBE_SIZE;
   maxY += FOOT_OFFSET + 0.4;
-  minZ -= ROW_DEPTH;
-  maxZ += ROW_DEPTH;
+  minZ -= CUBE_SIZE;
+  maxZ += CUBE_SIZE;
   return {
     min: [minX, minY, minZ],
     max: [maxX, maxY, maxZ],
@@ -156,10 +159,12 @@ export function fitDistance(
   padding = 1.55,
 ): number {
   const { min, max } = boardBounds(board);
-  const width = max[0] - min[0];
-  // The staircase is both tall and deep; from the front-elevated angle those
-  // two axes stack on screen, so add a share of depth to the vertical size.
-  const height = max[1] - min[1] + (max[2] - min[2]) * 0.45;
+  const extX = max[0] - min[0];
+  const extY = max[1] - min[1];
+  const extZ = max[2] - min[2];
+  // Corner isometric: X and Z both feed screen width and a share of height.
+  const width = (extX + extZ) * Math.SQRT1_2;
+  const height = extY * 0.82 + (extX + extZ) * 0.28;
   const fov = (fovDeg * Math.PI) / 180;
   const half = Math.tan(fov / 2);
   const distV = height / 2 / half;
@@ -169,8 +174,8 @@ export function fitDistance(
 }
 
 /**
- * Default camera: in front of the pyramid (+Z), a little to the right, far
- * enough that every cube (and the side discs) is on screen at start.
+ * Default camera: true isometric in the +X+Y+Z octant, far enough that
+ * every cube (and the side discs) is on screen at start.
  */
 export function pyramidCameraPos(
   board: Board,
@@ -179,9 +184,9 @@ export function pyramidCameraPos(
 ): [number, number, number] {
   const [fx, fy, fz] = pyramidFocus(board);
   const dist = fitDistance(board, CAMERA_FOV, aspect) * zoom;
-  const dirX = 0.2;
-  const dirY = 0.78;
-  const dirZ = 1.42;
+  const dirX = 1;
+  const dirY = 1;
+  const dirZ = 1;
   const len = Math.hypot(dirX, dirY, dirZ);
   return [
     fx + (dirX / len) * dist,

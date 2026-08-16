@@ -61,10 +61,10 @@ function EggSnake({ enemy }: { enemy: Enemy }) {
 function Crawler({ enemy }: { enemy: Enemy }) {
   const offset: Record<EnemyFace, [number, number, number]> = {
     top: [0, 0, 0],
-    north: [0, -0.15, CUBE_SIZE * 0.42],
-    south: [0, -0.15, -CUBE_SIZE * 0.42],
-    east: [CUBE_SIZE * 0.42, -0.15, 0],
-    west: [-CUBE_SIZE * 0.42, -0.15, 0],
+    north: [-CUBE_SIZE * 0.42, -0.15, 0],
+    south: [CUBE_SIZE * 0.42, -0.15, 0],
+    east: [0, -0.15, CUBE_SIZE * 0.42],
+    west: [0, -0.15, -CUBE_SIZE * 0.42],
   };
   const off = offset[enemy.face];
   return (

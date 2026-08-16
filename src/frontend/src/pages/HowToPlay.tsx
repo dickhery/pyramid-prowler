@@ -160,8 +160,9 @@ export function HowToPlay() {
             <p>
               Each round uses a different silhouette — shorter mesas, taller
               spires, chevrons, hourglasses, tridents, and boards with gaps. The
-              camera always looks at the front of the pyramid so every top face
-              is visible. Mute is in the HUD or Settings.
+              camera looks at the pyramid from the isometric corner so cubes sit
+              on a diagonal staircase, not a straight wall, and every top face
+              stays visible. Mute is in the HUD or Settings.
             </p>
           </Section>
 

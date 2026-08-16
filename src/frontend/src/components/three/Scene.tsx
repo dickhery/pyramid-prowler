@@ -157,7 +157,7 @@ export function Scene() {
       <fog attach="fog" args={["#121028", 36, 90]} />
       <ambientLight intensity={0.62} />
       <directionalLight
-        position={[4, 16, 10]}
+        position={[12, 18, 12]}
         intensity={1.35}
         castShadow
         shadow-mapSize-width={1024}
@@ -168,7 +168,7 @@ export function Scene() {
         shadow-camera-top={18}
         shadow-camera-bottom={-18}
       />
-      <directionalLight position={[-8, 6, 4]} intensity={0.4} />
+      <directionalLight position={[-6, 8, 10]} intensity={0.4} />
       <hemisphereLight args={["#9aa6e0", "#1a1630", 0.34]} />
 
       <GameLoop />

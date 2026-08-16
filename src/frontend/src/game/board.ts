@@ -3,6 +3,8 @@
  *
  * A board is a triangular staircase of cubes. Valid cells satisfy
  * 0 <= x <= z <= height-1, and y = height-1-z. The apex is (0, 0, height-1).
+ * World space maps down-left to +Z and down-right to +X so the staircase
+ * reads as a classic isometric pyramid, not a straight wall of boxes.
  * Every cube is reachable from the apex via the four diagonal hops.
  */
 import type {

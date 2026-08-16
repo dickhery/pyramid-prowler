@@ -36,13 +36,14 @@ function CubeMesh({
         ...extra,
       });
     // Box faces: +x, -x, +y, -y, +z, -z
+    // Camera sits in +X+Y+Z, so +Z is the left isometric face and +X is the right.
     return [
-      make(sideA),
-      make(sideA),
+      make(sideB),
+      make(sideB),
       make(top),
       make("#1a1630"),
-      make(sideB),
-      make(sideB),
+      make(sideA),
+      make(sideA),
     ];
   }, [top, sideA, sideB]);
 
